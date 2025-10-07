@@ -1,0 +1,20 @@
+# Hugin MCP Client Configuration
+# Copy this file to config.toml and edit for your setup
+
+# MCP Server configurations
+# Each server needs a command and optional arguments
+
+# Example: Local Python MCP server
+# [servers.ratatoskr]
+# command = "python3"
+# args = ["-m", "ratatoskr_mcp_server.server"]
+
+# Example: Filesystem MCP server
+# [servers.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/workspace"]
+
+# Example: Custom MCP server
+# [servers.my_server]
+# command = "/path/to/server"
+# args = ["--config", "config.json"]

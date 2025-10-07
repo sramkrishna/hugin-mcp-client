@@ -4,7 +4,10 @@ import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import Optional
+
+import tomllib
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -15,6 +18,22 @@ from .mcp_client import MCPClient
 from .orchestrator import Orchestrator
 
 console = Console()
+
+
+def load_config() -> dict:
+    """Load configuration from config.toml file."""
+    config_path = Path.cwd() / "config.toml"
+
+    if not config_path.exists():
+        return {}
+
+    try:
+        with open(config_path, "rb") as f:
+            config = tomllib.load(f)
+        return config.get("servers", {})
+    except Exception as e:
+        console.print(f"[red]Error loading config.toml: {e}[/red]")
+        return {}
 
 
 async def main_async() -> None:
@@ -42,28 +61,38 @@ async def main_async() -> None:
     console.print("\n[cyan]Initializing LLM client...[/cyan]")
     llm_client = LLMClient(api_key=api_key)
 
-    console.print("[cyan]Connecting to MCP servers...[/cyan]")
+    # Load and configure MCP servers from config file
+    server_configs = load_config()
+    mcp_clients = {}
 
-    # Configure MCP servers
-    # TODO: Make this configurable via config file
-    mcp_clients = {
-        "ratatoskr": MCPClient(
-            server_command=sys.executable,  # Use current Python (has ratatoskr-mcp-server installed)
-            server_args=["-m", "ratatoskr_mcp_server.server"],
+    for name, config in server_configs.items():
+        if "command" not in config:
+            console.print(f"[yellow]Warning: Server '{name}' missing 'command', skipping[/yellow]")
+            continue
+        mcp_clients[name] = MCPClient(
+            server_command=config["command"],
+            server_args=config.get("args", []),
         )
-    }
+
+    if mcp_clients:
+        console.print("[cyan]Connecting to MCP servers...[/cyan]")
 
     # Initialize orchestrator
     orchestrator = Orchestrator(llm_client, mcp_clients)
 
     try:
         await orchestrator.initialize()
-        console.print(
-            f"[green]✓ Connected to {len(mcp_clients)} MCP server(s)[/green]"
-        )
-        console.print(
-            f"[green]✓ Loaded {len(orchestrator.available_tools)} tool(s)[/green]\n"
-        )
+        if mcp_clients:
+            console.print(
+                f"[green]✓ Connected to {len(mcp_clients)} MCP server(s)[/green]"
+            )
+            console.print(
+                f"[green]✓ Loaded {len(orchestrator.available_tools)} tool(s)[/green]\n"
+            )
+        else:
+            console.print(
+                "[yellow]No MCP servers configured. Configure them in cli.py to enable tools.[/yellow]\n"
+            )
 
         # Interactive loop
         console.print(

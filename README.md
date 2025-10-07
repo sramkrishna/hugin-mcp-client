@@ -42,20 +42,25 @@ export ANTHROPIC_API_KEY='your-api-key-here'
 
 ### Configure MCP Servers
 
-Edit `src/ratatoskr_client/cli.py` to add your MCP servers:
+1. Copy the example configuration file:
+   ```bash
+   cp config.example.toml config.toml
+   ```
 
-```python
-mcp_clients = {
-    "ratatoskr": MCPClient(
-        server_command="python3.13",
-        server_args=["/path/to/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py"],
-    ),
-    "filesystem": MCPClient(
-        server_command="mcp-server-filesystem",
-        server_args=["/path/to/workspace"],
-    ),
-}
-```
+2. Edit `config.toml` to add your MCP servers:
+   ```toml
+   # Local Python MCP server
+   [servers.ratatoskr]
+   command = "python3"
+   args = ["-m", "ratatoskr_mcp_server.server"]
+
+   # Filesystem MCP server
+   [servers.filesystem]
+   command = "npx"
+   args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/workspace"]
+   ```
+
+The client will work without any MCP servers configured, but won't have access to any tools.
 
 ## Usage
 
@@ -134,13 +139,12 @@ class OpenAIClient:
 
 ### Add New MCP Server
 
-In your CLI or config:
+Add a new section to your `config.toml`:
 
-```python
-mcp_clients["my_server"] = MCPClient(
-    server_command="my-mcp-server",
-    server_args=["--config", "config.json"],
-)
+```toml
+[servers.my_server]
+command = "my-mcp-server"
+args = ["--config", "config.json"]
 ```
 
 ## License

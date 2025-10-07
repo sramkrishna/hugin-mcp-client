@@ -51,6 +51,9 @@ dmypy.json
 .env
 .env.local
 
+# Configuration (user-specific)
+config.toml
+
 # OS
 .DS_Store
 Thumbs.db

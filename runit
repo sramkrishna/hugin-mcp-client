@@ -1,0 +1,11 @@
+#!/bin/bash
+
+ podman run -it --rm \
+ --name hugin-mcp-client \
+-e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+-e LOG_LEVEL=INFO \
+-v ./config.toml:/app/config.toml:Z \
+-v ./logs:/app/logs:Z \
+-v ../ratatoskr-mcp-server:/mcp-server:Z \
+--user $(id -u):$(id -g) \
+localhost/hugin-mcp-client:latest

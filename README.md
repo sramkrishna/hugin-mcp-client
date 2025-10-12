@@ -28,39 +28,116 @@ User Input → LLM Client → Orchestrator → MCP Servers
 
 ## Installation
 
+**Quick Setup:**
 ```bash
+./setup-local.sh
+```
+
+**Manual Setup:**
+```bash
+python3.13 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
+**Note:** For MCP servers that need D-Bus access (like ratatoskr for GNOME integration), hugin must run directly on the host, not in containers.
+
 ## Configuration
 
-### Set API Key
-
-```bash
-export ANTHROPIC_API_KEY='your-api-key-here'
-```
-
-### Configure MCP Servers
-
-1. Copy the example configuration file:
+1. **Copy the example configuration file:**
    ```bash
    cp config.example.toml config.toml
    ```
 
-2. Edit `config.toml` to add your MCP servers:
-   ```toml
-   # Local Python MCP server
-   [servers.ratatoskr]
-   command = "python3"
-   args = ["-m", "ratatoskr_mcp_server.server"]
+2. **Configure your LLM provider** in `config.toml`:
 
-   # Filesystem MCP server
+   **Option A: Anthropic (Claude) - Best tool calling**
+   ```toml
+   [llm]
+   provider = "anthropic"
+   # model = "claude-sonnet-4-20250514"  # Optional
+   ```
+   Then set your API key:
+   ```bash
+   export ANTHROPIC_API_KEY='your-api-key-here'
+   ```
+
+3. **(Optional) Configure Logging:**
+   ```bash
+   export LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+   export LOG_FILE=/var/log/hugin.log  # Optional log file
+   ```
+
+   **Option B: vLLM (native in-process) - Best for local with GPU**
+
+   No server needed! Direct Python integration:
+   ```bash
+   pip install 'hugin-mcp-client[vllm]'
+   ```
+
+   ```toml
+   [llm]
+   provider = "vllm"
+   model = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+   tensor_parallel_size = 1  # Number of GPUs to use
+   gpu_memory_utilization = 0.9
+   ```
+
+   Advantages: Fastest inference, no server overhead, excellent tool calling
+
+   **Option C: OpenAI-compatible servers - Good for flexibility**
+
+   Supports: LM Studio, vLLM server, llama.cpp server, LocalAI
+   ```toml
+   [llm]
+   provider = "openai"
+   model = "your-model-name"
+   base_url = "http://localhost:1234/v1"
+   # api_key not needed for local servers
+   ```
+
+   Example servers:
+   - **LM Studio**: Download from lmstudio.ai, easiest GUI option
+   - **vLLM server**: `vllm serve model-name --api-key none`
+   - **llama.cpp**: `./server -m model.gguf --port 8080`
+
+   **Option D: Ollama - Limited tool calling support**
+   ```toml
+   [llm]
+   provider = "ollama"
+   model = "mistral"  # Best for tools: mistral, llama3.2
+   # base_url = "http://localhost:11434"  # Optional
+   ```
+   Make sure Ollama is running:
+   ```bash
+   systemctl start ollama  # or: ollama serve
+   ```
+
+3. **(Optional) Configure MCP Servers** in `config.toml`:
+   ```toml
+   # Example: Filesystem MCP server
    [servers.filesystem]
-   command = "npx"
-   args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/workspace"]
+   command = "uvx"
+   args = ["mcp-server-filesystem", "/path/to/workspace"]
    ```
 
 The client will work without any MCP servers configured, but won't have access to any tools.
+
+### Using with Ratatoskr MCP Server
+
+Hugin can connect to the [Ratatoskr MCP Server](https://github.com/yourusername/ratatoskr-mcp-server) to access GNOME Desktop integration tools.
+
+**Configuration:**
+```toml
+[servers.ratatoskr]
+command = "python3.13"
+args = ["/path/to/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py"]
+```
+
+**What you can ask:**
+- "What version of GNOME am I running?"
+- "What's my desktop environment?"
+- "What's my GNOME Shell version?"
 
 ## Usage
 

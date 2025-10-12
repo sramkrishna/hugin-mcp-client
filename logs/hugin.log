@@ -1,0 +1,26 @@
+2025-10-11 18:41:35 - hugin_mcp_client.cli - INFO - Starting Hugin MCP client
+2025-10-11 18:41:35 - hugin_mcp_client.orchestrator - INFO - Initializing orchestrator...
+2025-10-11 18:41:35 - hugin_mcp_client.orchestrator - INFO - Connecting to MCP server: ratatoskr
+2025-10-11 18:41:35 - hugin_mcp_client.mcp_client - INFO - Connecting to MCP server: python3.13 /var/home/sri/Projects/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py
+2025-10-11 18:41:35 - hugin_mcp_client.mcp_client - INFO - Connected to MCP server
+2025-10-11 18:41:35 - hugin_mcp_client.orchestrator - INFO - Initialized with 1 tools
+2025-10-11 18:41:42 - hugin_mcp_client.orchestrator - INFO - Processing message: what version of GNOME am I running?
+2025-10-11 18:41:42 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-11 18:41:42 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: what version of GNOME am I running?...
+2025-10-11 18:41:44 - hugin_mcp_client.llm_client - INFO - Received response from LLM: tool_use
+2025-10-11 18:41:44 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 1 tool calls
+2025-10-11 18:41:44 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 48
+2025-10-11 18:41:44 - hugin_mcp_client.orchestrator - INFO - LLM requested tool use
+2025-10-11 18:41:44 - hugin_mcp_client.orchestrator - INFO - Executing tool: ratatoskr_get_desktop_info
+2025-10-11 18:41:44 - hugin_mcp_client.orchestrator - INFO - Tool result: {
+  "desktop_environment": "GNOME",
+  "gnome_shell_version": "48.4",
+  "gnome_shell_mode": "user",
+ ...
+2025-10-11 18:41:44 - hugin_mcp_client.orchestrator - INFO - Iteration 2/5
+2025-10-11 18:41:44 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: ...
+2025-10-11 18:41:48 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-11 18:41:48 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Found 0 tool calls
+2025-10-11 18:41:48 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Text content length: 133
+2025-10-11 18:44:02 - hugin_mcp_client.orchestrator - INFO - Disconnecting from MCP server: ratatoskr
+2025-10-11 18:44:02 - hugin_mcp_client.mcp_client - INFO - Disconnected from MCP server

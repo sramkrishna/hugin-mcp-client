@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
-from .llm_client import LLMClient
+from .llm_provider import LLMProvider
 from .mcp_client import MCPClient
 
 logger = logging.getLogger(__name__)
@@ -15,14 +15,14 @@ class Orchestrator:
 
     def __init__(
         self,
-        llm_client: LLMClient,
+        llm_client: LLMProvider,
         mcp_clients: Dict[str, MCPClient],
     ):
         """
         Initialize orchestrator.
 
         Args:
-            llm_client: LLM client for AI interactions
+            llm_client: LLM provider for AI interactions
             mcp_clients: Dictionary of MCP clients (name -> client)
         """
         self.llm = llm_client
@@ -83,14 +83,23 @@ class Orchestrator:
             )
 
             # Check if LLM wants to use tools
-            if response.stop_reason == "tool_use":
+            tool_calls = self.llm.extract_tool_calls(response)
+            logger.info(f"Iteration {iteration}: Found {len(tool_calls)} tool calls")
+
+            # Also check if there's text content
+            text_content = self.llm.extract_text_response(response)
+            logger.info(f"Iteration {iteration}: Text content length: {len(text_content)}")
+
+            if tool_calls:
                 logger.info("LLM requested tool use")
-                tool_calls = self.llm.extract_tool_calls(response)
 
                 # Add assistant message to history (with tool use)
-                self.llm.conversation_history.append(
-                    {"role": "assistant", "content": response.content}
-                )
+                # For Anthropic, response.content is the full content
+                # For Ollama, we need to add the message from response
+                if hasattr(response, 'content'):
+                    self.llm.conversation_history.append(
+                        {"role": "assistant", "content": response.content}
+                    )
 
                 # Execute each tool call
                 for tool_call in tool_calls:
@@ -123,20 +132,15 @@ class Orchestrator:
                         logger.error(result)
 
                     # Add tool result to conversation
-                    self.llm.add_tool_result(tool_id, result)
+                    self.llm.add_tool_result(tool_id, result, response)
 
                 # Continue loop to let LLM process tool results
                 continue
 
-            elif response.stop_reason == "end_turn":
+            else:
                 # LLM is done, return final response
                 final_text = self.llm.extract_text_response(response)
                 self.llm.add_assistant_message(final_text)
-                return final_text
-
-            else:
-                logger.warning(f"Unexpected stop reason: {response.stop_reason}")
-                final_text = self.llm.extract_text_response(response)
                 return final_text
 
         logger.warning(f"Reached maximum iterations ({max_iterations})")

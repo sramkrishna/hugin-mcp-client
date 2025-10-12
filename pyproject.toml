@@ -27,6 +27,8 @@ classifiers = [
 dependencies = [
     "mcp>=1.0.0,<2.0.0",
     "anthropic>=0.40.0",
+    "openai>=1.0.0",
+    "httpx>=0.24.0",
     "pydantic>=2.0.0,<3.0.0",
     "anyio>=3.0.0,<5.0.0",
     "rich>=13.0.0",  # For nice CLI output
@@ -39,6 +41,9 @@ dev = [
     "mypy>=1.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+]
+vllm = [
+    "vllm>=0.5.0",
 ]
 
 [project.scripts]

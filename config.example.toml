@@ -1,20 +1,56 @@
 # Hugin MCP Client Configuration
 # Copy this file to config.toml and edit for your setup
 
+# LLM Provider Configuration
+[llm]
+# Provider: "anthropic", "vllm", "openai", or "ollama"
+provider = "anthropic"
+
+# For Anthropic (Claude) - Best tool calling support:
+# Set ANTHROPIC_API_KEY environment variable
+# model = "claude-sonnet-4-20250514"  # Optional, defaults to claude-sonnet-4
+
+# For vLLM (native in-process, no server needed) - Excellent for local:
+# provider = "vllm"
+# model = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+# tensor_parallel_size = 1  # Number of GPUs
+# gpu_memory_utilization = 0.9  # Fraction of GPU memory to use
+# Install with: pip install 'hugin-mcp-client[vllm]'
+
+# For OpenAI (or local OpenAI-compatible servers) - Good tool calling:
+# provider = "openai"
+# model = "gpt-4"  # Or your local model name
+# api_key = "sk-..."  # Or set OPENAI_API_KEY env var
+# For local servers (LM Studio, vLLM server, llama.cpp, LocalAI):
+# base_url = "http://localhost:1234/v1"  # LM Studio default
+# api_key can be anything for local servers
+
+# For Ollama (local models) - Limited tool calling support:
+# provider = "ollama"
+# model = "mistral"  # Or "llama3.2", "qwen3-coder", etc.
+# base_url = "http://localhost:11434"  # Optional, defaults to localhost:11434
+
 # MCP Server configurations
 # Each server needs a command and optional arguments
 
-# Example: Local Python MCP server
+# Example: Ratatoskr MCP server (GNOME Desktop integration)
+# Provides tools to query GNOME Shell version, desktop environment info, etc.
 # [servers.ratatoskr]
-# command = "python3"
-# args = ["-m", "ratatoskr_mcp_server.server"]
+# command = "python3.13"
+# args = ["/path/to/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py"]
+# Or if installed: command = "ratatoskr-mcp-server"
 
-# Example: Filesystem MCP server
+# Example: Filesystem MCP server (using uvx to auto-install)
 # [servers.filesystem]
-# command = "npx"
-# args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/workspace"]
+# command = "uvx"
+# args = ["mcp-server-filesystem", "/path/to/workspace"]
 
-# Example: Custom MCP server
+# Example: Official MCP servers via npx
+# [servers.fetch]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-fetch"]
+
+# Example: Locally installed server executable
 # [servers.my_server]
-# command = "/path/to/server"
-# args = ["--config", "config.json"]
+# command = "my-mcp-server"  # Must be in PATH
+# args = ["--workspace", "/path/to/workspace"]

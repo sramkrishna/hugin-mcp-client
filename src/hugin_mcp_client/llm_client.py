@@ -6,31 +6,25 @@ from typing import Any, Dict, List, Optional
 from anthropic import Anthropic
 from anthropic.types import Message, TextBlock, ToolUseBlock
 
+from .llm_provider import LLMProvider
+
 logger = logging.getLogger(__name__)
 
 
-class LLMClient:
-    """Client for interacting with LLMs (Anthropic Claude)."""
+class AnthropicProvider(LLMProvider):
+    """Provider for Anthropic Claude API."""
 
     def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-20250514"):
         """
-        Initialize LLM client.
+        Initialize Anthropic provider.
 
         Args:
             api_key: Anthropic API key (or set ANTHROPIC_API_KEY env var)
             model: Claude model to use
         """
+        super().__init__()
         self.client = Anthropic(api_key=api_key)
         self.model = model
-        self.conversation_history: List[Dict[str, Any]] = []
-
-    def add_user_message(self, content: str) -> None:
-        """Add a user message to conversation history."""
-        self.conversation_history.append({"role": "user", "content": content})
-
-    def add_assistant_message(self, content: str) -> None:
-        """Add an assistant message to conversation history."""
-        self.conversation_history.append({"role": "assistant", "content": content})
 
     def create_message(
         self,
@@ -95,13 +89,14 @@ class LLMClient:
                 )
         return tool_calls
 
-    def add_tool_result(self, tool_use_id: str, result: str) -> None:
+    def add_tool_result(self, tool_use_id: str, result: str, response: Message) -> None:
         """
         Add tool result to conversation history.
 
         Args:
             tool_use_id: ID of the tool use from the LLM response
             result: Result from the tool execution
+            response: The full response object from the previous LLM call
         """
         # Add assistant message with tool use
         # Note: This should be the full assistant message including tool use
@@ -121,6 +116,6 @@ class LLMClient:
             }
         )
 
-    def clear_history(self) -> None:
-        """Clear conversation history."""
-        self.conversation_history = []
+
+# Backwards compatibility alias
+LLMClient = AnthropicProvider

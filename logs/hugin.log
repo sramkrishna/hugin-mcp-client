@@ -24,3 +24,95 @@
 2025-10-11 18:41:48 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Text content length: 133
 2025-10-11 18:44:02 - hugin_mcp_client.orchestrator - INFO - Disconnecting from MCP server: ratatoskr
 2025-10-11 18:44:02 - hugin_mcp_client.mcp_client - INFO - Disconnected from MCP server
+2025-10-11 18:57:02 - hugin_mcp_client.cli - INFO - Starting Hugin MCP client
+2025-10-11 18:57:02 - hugin_mcp_client.orchestrator - INFO - Initializing orchestrator...
+2025-10-11 18:57:02 - hugin_mcp_client.orchestrator - INFO - Connecting to MCP server: ratatoskr
+2025-10-11 18:57:02 - hugin_mcp_client.mcp_client - INFO - Connecting to MCP server: python3.13 /var/home/sri/Projects/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py
+2025-10-11 18:57:02 - hugin_mcp_client.mcp_client - INFO - Connected to MCP server
+2025-10-11 18:57:02 - hugin_mcp_client.orchestrator - INFO - Initialized with 1 tools
+2025-10-11 18:57:12 - hugin_mcp_client.orchestrator - INFO - Processing message: what distro am I running this on?
+2025-10-11 18:57:12 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-11 18:57:12 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: what distro am I running this on?...
+2025-10-11 18:57:14 - hugin_mcp_client.llm_client - INFO - Received response from LLM: tool_use
+2025-10-11 18:57:14 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 1 tool calls
+2025-10-11 18:57:14 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 80
+2025-10-11 18:57:14 - hugin_mcp_client.orchestrator - INFO - LLM requested tool use
+2025-10-11 18:57:14 - hugin_mcp_client.orchestrator - INFO - Executing tool: ratatoskr_get_desktop_info
+2025-10-11 18:57:14 - hugin_mcp_client.orchestrator - INFO - Tool result: {
+  "desktop_environment": "GNOME",
+  "gnome_shell_version": "48.4",
+  "gnome_shell_mode": "user",
+ ...
+2025-10-11 18:57:14 - hugin_mcp_client.orchestrator - INFO - Iteration 2/5
+2025-10-11 18:57:14 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: ...
+2025-10-11 18:57:20 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-11 18:57:20 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Found 0 tool calls
+2025-10-11 18:57:20 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Text content length: 562
+2025-10-11 18:59:26 - hugin_mcp_client.orchestrator - INFO - Processing message: what distro am I running this on?
+2025-10-11 18:59:26 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-11 18:59:26 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: what distro am I running this on?...
+2025-10-11 18:59:30 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-11 18:59:30 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 0 tool calls
+2025-10-11 18:59:30 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 561
+2025-10-11 18:59:33 - hugin_mcp_client.orchestrator - INFO - Disconnecting from MCP server: ratatoskr
+2025-10-11 18:59:33 - hugin_mcp_client.mcp_client - INFO - Disconnected from MCP server
+2025-10-11 18:59:35 - hugin_mcp_client.cli - INFO - Starting Hugin MCP client
+2025-10-11 18:59:35 - hugin_mcp_client.orchestrator - INFO - Initializing orchestrator...
+2025-10-11 18:59:35 - hugin_mcp_client.orchestrator - INFO - Connecting to MCP server: ratatoskr
+2025-10-11 18:59:35 - hugin_mcp_client.mcp_client - INFO - Connecting to MCP server: python3.13 /var/home/sri/Projects/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py
+2025-10-11 18:59:35 - hugin_mcp_client.mcp_client - INFO - Connected to MCP server
+2025-10-11 18:59:35 - hugin_mcp_client.orchestrator - INFO - Initialized with 2 tools
+2025-10-11 18:59:39 - hugin_mcp_client.orchestrator - INFO - Processing message: what distro am I running this on?
+2025-10-11 18:59:39 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-11 18:59:39 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: what distro am I running this on?...
+2025-10-11 18:59:41 - hugin_mcp_client.llm_client - INFO - Received response from LLM: tool_use
+2025-10-11 18:59:41 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 1 tool calls
+2025-10-11 18:59:41 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 65
+2025-10-11 18:59:41 - hugin_mcp_client.orchestrator - INFO - LLM requested tool use
+2025-10-11 18:59:41 - hugin_mcp_client.orchestrator - INFO - Executing tool: ratatoskr_get_distro_info
+2025-10-11 18:59:41 - hugin_mcp_client.orchestrator - INFO - Tool result: {
+  "name": "Fedora Linux",
+  "version": "43 (Toolbx Container Image Prerelease)",
+  "version_id": "...
+2025-10-11 18:59:41 - hugin_mcp_client.orchestrator - INFO - Iteration 2/5
+2025-10-11 18:59:41 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: ...
+2025-10-11 18:59:44 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-11 18:59:44 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Found 0 tool calls
+2025-10-11 18:59:44 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Text content length: 254
+2025-10-11 19:28:27 - hugin_mcp_client.orchestrator - INFO - Disconnecting from MCP server: ratatoskr
+2025-10-11 19:28:27 - hugin_mcp_client.mcp_client - INFO - Disconnected from MCP server
+2025-10-12 00:07:55 - hugin_mcp_client.cli - INFO - Starting Hugin MCP client
+2025-10-12 00:07:55 - hugin_mcp_client.orchestrator - INFO - Initializing orchestrator...
+2025-10-12 00:07:55 - hugin_mcp_client.orchestrator - INFO - Connecting to MCP server: ratatoskr
+2025-10-12 00:07:55 - hugin_mcp_client.mcp_client - INFO - Connecting to MCP server: python3.13 /var/home/sri/Projects/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py
+2025-10-12 00:07:55 - hugin_mcp_client.mcp_client - INFO - Connected to MCP server
+2025-10-12 00:07:55 - hugin_mcp_client.orchestrator - INFO - Initialized with 3 tools
+2025-10-12 00:08:08 - hugin_mcp_client.orchestrator - INFO - Processing message: list the gnome extensions I have.
+2025-10-12 00:08:08 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-12 00:08:08 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: list the gnome extensions I have....
+2025-10-12 00:08:10 - hugin_mcp_client.llm_client - INFO - Received response from LLM: tool_use
+2025-10-12 00:08:10 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 1 tool calls
+2025-10-12 00:08:10 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 67
+2025-10-12 00:08:10 - hugin_mcp_client.orchestrator - INFO - LLM requested tool use
+2025-10-12 00:08:10 - hugin_mcp_client.orchestrator - INFO - Executing tool: ratatoskr_get_gnome_extensions
+2025-10-12 00:08:10 - hugin_mcp_client.orchestrator - INFO - Tool result: {
+  "enabled_extensions": [
+    "appindicatorsupport@rgcjonas.gmail.com",
+    "blur-my-shell@aunetx"...
+2025-10-12 00:08:10 - hugin_mcp_client.orchestrator - INFO - Iteration 2/5
+2025-10-12 00:08:10 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: ...
+2025-10-12 00:08:15 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-12 00:08:15 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Found 0 tool calls
+2025-10-12 00:08:15 - hugin_mcp_client.orchestrator - INFO - Iteration 2: Text content length: 731
+2025-10-12 00:08:51 - hugin_mcp_client.orchestrator - INFO - Processing message: tell me about blue my shell extension?
+2025-10-12 00:08:51 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-12 00:08:51 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: tell me about blue my shell extension?...
+2025-10-12 00:08:59 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-12 00:08:59 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 0 tool calls
+2025-10-12 00:08:59 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 1391
+2025-10-12 00:24:24 - hugin_mcp_client.orchestrator - INFO - Processing message: of the extensions i have installed which is the most popular?
+2025-10-12 00:24:24 - hugin_mcp_client.orchestrator - INFO - Iteration 1/5
+2025-10-12 00:24:24 - hugin_mcp_client.llm_client - INFO - Sending message to LLM: of the extensions i have installed which is the most popular?...
+2025-10-12 00:24:34 - hugin_mcp_client.llm_client - INFO - Received response from LLM: end_turn
+2025-10-12 00:24:34 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Found 0 tool calls
+2025-10-12 00:24:34 - hugin_mcp_client.orchestrator - INFO - Iteration 1: Text content length: 1343

@@ -14,14 +14,14 @@ if [ -z "$ANTHROPIC_API_KEY" ]; then
     exit 1
 fi
 
-# Check if hugin is installed
-if ! command -v hugin &> /dev/null; then
-    echo "Hugin is not installed. Installing..."
-    pip install -e . || {
-        echo "Installation failed"
-        exit 1
-    }
+# Check if virtual environment exists
+if [ ! -d ".venv" ]; then
+    echo "Virtual environment not found. Please run ./setup-local.sh first"
+    exit 1
 fi
+
+# Activate virtual environment
+source .venv/bin/activate
 
 # Check if config.toml exists
 if [ ! -f config.toml ]; then

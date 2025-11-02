@@ -141,8 +141,9 @@ async def main_async() -> None:
     if mcp_clients:
         console.print("[cyan]Connecting to MCP servers...[/cyan]")
 
-    # Initialize orchestrator
-    orchestrator = Orchestrator(llm_client, mcp_clients)
+    # Initialize orchestrator with compression settings
+    max_result_length = llm_config.get("max_result_length", 10000)  # Increased default to reduce hallucination
+    orchestrator = Orchestrator(llm_client, mcp_clients, max_result_length=max_result_length)
 
     try:
         await orchestrator.initialize()
@@ -160,7 +161,8 @@ async def main_async() -> None:
 
         # Interactive loop
         console.print(
-            "[yellow]Type your questions below (Ctrl+C or 'exit' to quit)[/yellow]\n"
+            "[yellow]Type your questions below\n"
+            "Commands: 'exit' to quit, 'clear' to reset, 'tokens' to see usage[/yellow]\n"
         )
 
         while True:
@@ -169,6 +171,19 @@ async def main_async() -> None:
 
                 if user_input.lower() in ["exit", "quit", "q"]:
                     break
+
+                if user_input.lower() in ["clear", "reset"]:
+                    llm_client.clear_history()
+                    console.print("[cyan]✨ Conversation history cleared[/cyan]\n")
+                    continue
+
+                if user_input.lower() in ["tokens", "usage"]:
+                    if hasattr(llm_client, 'format_token_usage'):
+                        usage_str = llm_client.format_token_usage()
+                        console.print(f"[cyan]📊 Token Usage: {usage_str}[/cyan]\n")
+                    else:
+                        console.print("[yellow]Token usage not available for this provider[/yellow]\n")
+                    continue
 
                 if not user_input.strip():
                     continue
@@ -186,14 +201,80 @@ async def main_async() -> None:
                         border_style="blue",
                     )
                 )
+
+                # Display token usage if available (Anthropic provider)
+                if hasattr(llm_client, 'format_token_usage'):
+                    usage_str = llm_client.format_token_usage()
+                    console.print(f"[dim]{usage_str}[/dim]")
+
                 console.print()
 
             except KeyboardInterrupt:
                 console.print("\n[yellow]Interrupted[/yellow]")
                 break
             except Exception as e:
-                console.print(f"[red]Error: {e}[/red]")
-                logging.exception("Error processing message")
+                # Check for specific error types with friendly messages
+                error_msg = str(e)
+                error_type = type(e).__name__
+
+                # DEBUG: Log the actual error before showing friendly message
+                logger.error(f"Caught exception: {error_type}: {error_msg}")
+                console.print(f"[dim]DEBUG - Error type: {error_type}[/dim]")
+                console.print(f"[dim]DEBUG - Error message: {error_msg[:200]}[/dim]")
+
+                if "credit balance is too low" in error_msg or "billing" in error_msg.lower():
+                    console.print(
+                        "\n[red]💳 Insufficient API Credits[/red]\n\n"
+                        "Your Anthropic API account has run out of credits.\n\n"
+                        "[cyan]Solutions:[/cyan]\n"
+                        "  • Visit https://console.anthropic.com/settings/billing to add credits\n"
+                        "  • Switch to a local LLM provider (edit config.toml):\n"
+                        "    - Ollama (free, local)\n"
+                        "    - vLLM (free, local, requires GPU)\n"
+                        "    - LM Studio (free, local GUI)\n"
+                    )
+                elif "500" in error_msg or "internal server error" in error_msg.lower():
+                    console.print(
+                        "\n[yellow]⚠️  Anthropic API Internal Error[/yellow]\n\n"
+                        "Anthropic's servers are experiencing internal errors (HTTP 500).\n"
+                        "This is a temporary server-side issue.\n\n"
+                        "[cyan]Options:[/cyan]\n"
+                        "  • Wait 1-2 minutes and try again\n"
+                        "  • Try a simpler query to test if the API is working\n"
+                        "  • Use a local LLM (see config.toml for Ollama options)\n"
+                    )
+                elif "overloaded" in error_msg.lower() or "529" in error_msg:
+                    console.print(
+                        "\n[yellow]⚠️  Anthropic API Overloaded[/yellow]\n\n"
+                        "Anthropic's servers are temporarily overloaded (high traffic).\n"
+                        "This is a temporary issue on their end, not a problem with Hugin.\n\n"
+                        "[cyan]Options:[/cyan]\n"
+                        "  • Wait 30-60 seconds and try again\n"
+                        "  • Try again - Hugin will automatically retry with exponential backoff\n"
+                        "  • Use a local LLM (see config.toml for Ollama/vLLM options)\n"
+                    )
+                elif "rate_limit_error" in error_msg or "429" in error_msg:
+                    console.print(
+                        "\n[yellow]⚠️  Rate Limit Exceeded[/yellow]\n\n"
+                        "The conversation has grown too large and hit the API rate limit.\n"
+                        "This happens when too many tokens are sent in a short time.\n\n"
+                        "[cyan]Options:[/cyan]\n"
+                        "  • Wait a minute and try again\n"
+                        "  • Type 'clear' to start a fresh conversation\n"
+                        "  • Use a local LLM (see config.toml for Ollama/vLLM options)\n"
+                    )
+                elif "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
+                    console.print(
+                        "\n[red]🔑 Authentication Error[/red]\n\n"
+                        "Your API key is invalid or missing.\n\n"
+                        "[cyan]Fix:[/cyan]\n"
+                        "  • Set ANTHROPIC_API_KEY environment variable:\n"
+                        "    export ANTHROPIC_API_KEY='your-key-here'\n"
+                        "  • Or add it to config.toml (not recommended for security)\n"
+                    )
+                else:
+                    console.print(f"[red]Error: {e}[/red]")
+                    logging.exception("Error processing message")
 
     finally:
         console.print("\n[cyan]Cleaning up...[/cyan]")

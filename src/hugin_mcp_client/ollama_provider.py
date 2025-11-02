@@ -87,9 +87,11 @@ class OllamaProvider(LLMProvider):
         logger.info(f"Sending message to Ollama ({self.model}): {user_message[:100]}...")
 
         try:
+            # Use longer timeout for local inference (5 minutes)
             response = self.client.post(
                 f"{self.base_url}/api/chat",
                 json=request_data,
+                timeout=300.0,  # 5 minutes for slow CPU inference
             )
             response.raise_for_status()
             result = response.json()

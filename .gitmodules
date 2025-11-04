@@ -1,0 +1,6 @@
+[submodule "servers/ratatoskr"]
+	path = servers/ratatoskr
+	url = https://github.com/sramkrishna/ratatoskr-mcp-server.git
+[submodule "servers/muninn"]
+	path = servers/muninn
+	url = https://github.com/sramkrishna/muninn-mcp-server.git

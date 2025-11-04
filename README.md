@@ -4,9 +4,25 @@ A Python client for connecting LLMs (Large Language Models) with MCP (Model Cont
 
 Named after Hugin, one of Odin's ravens in Norse mythology who flies around the world gathering information and bringing it back. Just as Hugin gathers knowledge, this client gathers information through MCP servers and AI.
 
+## Complete Suite
+
+This repository includes everything you need via git submodules:
+
+- **Hugin** (this repo): MCP client with LLM orchestration
+- **[Ratatoskr](servers/ratatoskr)**: MCP server for GNOME/Evolution integration
+  - Evolution email search and analysis
+  - Contact management
+  - Calendar integration
+  - Planify task management
+- **[Muninn](servers/muninn)**: Privacy-first CRM with semantic search
+  - Log interactions with contacts
+  - Semantic search across interaction history
+  - Contact notes and metadata
+  - Local-only storage
+
 ## Features
 
-- **LLM Integration**: Built-in support for Anthropic's Claude API
+- **LLM Integration**: Built-in support for Anthropic's Claude API and Ollama
 - **MCP Protocol**: Connect to any MCP-compliant server
 - **Tool Orchestration**: Automatic tool discovery and execution
 - **Interactive CLI**: Chat interface with rich terminal output
@@ -15,32 +31,61 @@ Named after Hugin, one of Odin's ravens in Norse mythology who flies around the 
 ## Architecture
 
 ```
-User Input → LLM Client → Orchestrator → MCP Servers
-                 ↓             ↓              ↓
-            Claude API    Tool Routing   Resources/Tools
+User Input → Hugin (LLM Client) → Orchestrator → MCP Servers
+                      ↓                 ↓             ↓
+                 Claude/Ollama     Tool Routing   Ratatoskr (GNOME)
+                                                   Muninn (CRM)
 ```
 
 ## Requirements
 
 - Python 3.9 - 3.13
-- Anthropic API key
-- One or more MCP servers to connect to
+- Anthropic API key (for Claude) or Ollama (for local models)
+- Git (for submodules)
 
 ## Installation
 
-**Quick Setup:**
+**Complete Installation (Recommended):**
+
+This will install Hugin and both MCP servers:
+
 ```bash
-./setup-local.sh
+# Clone with submodules
+git clone --recursive https://github.com/sramkrishna/hugin-mcp-client.git
+cd hugin-mcp-client
+
+# Run the installer
+./install.sh
 ```
 
 **Manual Setup:**
 ```bash
-python3.13 -m venv .venv
+# Initialize submodules
+git submodule update --init --recursive
+
+# Install Hugin
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+
+# Install Ratatoskr
+cd servers/ratatoskr
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+deactivate
+cd ../..
+
+# Install Muninn
+cd servers/muninn
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+deactivate
+cd ../..
 ```
 
-**Note:** For MCP servers that need D-Bus access (like ratatoskr for GNOME integration), hugin must run directly on the host, not in containers.
+**Note:** For MCP servers that need D-Bus access (like Ratatoskr for GNOME integration), Hugin must run directly on the host, not in containers.
 
 ## Configuration
 

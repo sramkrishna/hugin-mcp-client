@@ -48,3 +48,8 @@ def setup_logging(
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("anthropic").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+
+    # Suppress MCP server logs (they run in subprocesses but may log to parent)
+    logging.getLogger("ratatoskr_mcp_server").setLevel(logging.WARNING)
+    logging.getLogger("muninn_mcp_server").setLevel(logging.WARNING)
+    logging.getLogger("mcp").setLevel(logging.WARNING)

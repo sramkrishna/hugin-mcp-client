@@ -2,7 +2,9 @@
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,40 @@ class BuiltinTools:
                     },
                     "required": ["period"],
                 },
+            },
+            {
+                "name": "hugin_write_file",
+                "description": (
+                    "Write content to a file. Supports any text-based file format including "
+                    "code files (py, js, ts, etc.), documentation (md, txt, rst), "
+                    "data files (json, yaml, toml, csv, xml), and configuration files. "
+                    "Can create parent directories automatically."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": (
+                                "Path to the file to write (absolute or relative to current directory). "
+                                "Example: '/home/user/document.txt' or 'output/data.json'"
+                            ),
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "The content to write to the file",
+                        },
+                        "overwrite": {
+                            "type": "boolean",
+                            "description": "Whether to overwrite the file if it already exists (default: false)",
+                        },
+                        "create_dirs": {
+                            "type": "boolean",
+                            "description": "Whether to create parent directories if they don't exist (default: true)",
+                        },
+                    },
+                    "required": ["file_path", "content"],
+                },
             }
         ]
 
@@ -70,6 +106,8 @@ class BuiltinTools:
         """
         if tool_name == "hugin_calculate_date_range":
             return await BuiltinTools._calculate_date_range(arguments)
+        elif tool_name == "hugin_write_file":
+            return await BuiltinTools._write_file(arguments)
         else:
             raise ValueError(f"Unknown built-in tool: {tool_name}")
 
@@ -327,3 +365,102 @@ class BuiltinTools:
                 "last N weeks, last N months, past N days, N weeks ago, N months ago, "
                 "last monday/tuesday/etc., this monday/tuesday/etc."
             )
+
+    @staticmethod
+    async def _write_file(arguments: Dict[str, Any]) -> str:
+        """
+        Write content to a file.
+
+        Args:
+            arguments: Dict with 'file_path', 'content', optional 'overwrite' and 'create_dirs'
+
+        Returns:
+            JSON string with operation result
+        """
+        file_path_str = arguments.get("file_path", "").strip()
+        content = arguments.get("content", "")
+        overwrite = arguments.get("overwrite", False)
+        create_dirs = arguments.get("create_dirs", True)
+
+        if not file_path_str:
+            return json.dumps({
+                "error": "file_path is required",
+                "success": False
+            })
+
+        try:
+            # Convert to Path object and resolve
+            file_path = Path(file_path_str).expanduser()
+
+            # If relative path, make it relative to current working directory
+            if not file_path.is_absolute():
+                file_path = Path.cwd() / file_path
+
+            # Safety check: prevent writing to sensitive system directories
+            restricted_dirs = ['/etc', '/sys', '/proc', '/dev', '/boot']
+            file_path_str_resolved = str(file_path.resolve())
+
+            for restricted in restricted_dirs:
+                if file_path_str_resolved.startswith(restricted):
+                    return json.dumps({
+                        "error": f"Cannot write to restricted system directory: {restricted}",
+                        "success": False,
+                        "file_path": file_path_str_resolved
+                    })
+
+            # Check if file exists
+            if file_path.exists() and not overwrite:
+                return json.dumps({
+                    "error": f"File already exists: {file_path}. Set overwrite=true to replace it.",
+                    "success": False,
+                    "file_path": str(file_path),
+                    "file_exists": True
+                })
+
+            # Create parent directories if needed
+            if create_dirs:
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created directory: {file_path.parent}")
+
+            # Write the file
+            file_path.write_text(content, encoding='utf-8')
+
+            # Get file info
+            file_size = file_path.stat().st_size
+            file_type = file_path.suffix or "no extension"
+
+            logger.info(f"Successfully wrote file: {file_path} ({file_size} bytes)")
+
+            return json.dumps({
+                "success": True,
+                "file_path": str(file_path),
+                "file_size": file_size,
+                "file_type": file_type,
+                "message": f"Successfully wrote {file_size} bytes to {file_path.name}",
+                "absolute_path": str(file_path.resolve())
+            }, indent=2)
+
+        except PermissionError as e:
+            error_msg = f"Permission denied: Cannot write to {file_path_str}"
+            logger.error(error_msg)
+            return json.dumps({
+                "error": error_msg,
+                "success": False,
+                "details": str(e)
+            })
+        except OSError as e:
+            error_msg = f"OS error writing file: {str(e)}"
+            logger.error(error_msg)
+            return json.dumps({
+                "error": error_msg,
+                "success": False,
+                "file_path": file_path_str
+            })
+        except Exception as e:
+            error_msg = f"Unexpected error writing file: {str(e)}"
+            logger.error(error_msg)
+            return json.dumps({
+                "error": error_msg,
+                "success": False,
+                "exception_type": type(e).__name__
+            })

@@ -6,6 +6,13 @@
 # Provider: "anthropic", "vllm", "openai", or "ollama"
 provider = "anthropic"
 
+# Token Management Settings
+# max_result_length = 10000  # Max chars for tool results (default: 10000)
+#                             # Longer results are compressed to save tokens
+#                             # Lower values save tokens but may cause hallucination
+# enable_caching = true       # Enable Anthropic prompt caching (default: true)
+#                             # Reduces costs by caching tool definitions
+
 # For Anthropic (Claude) - Best tool calling support:
 # Set ANTHROPIC_API_KEY environment variable
 # model = "claude-sonnet-4-20250514"  # Optional, defaults to claude-sonnet-4

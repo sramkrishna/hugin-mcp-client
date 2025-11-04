@@ -7,13 +7,6 @@ set -e
 
 cd "$(dirname "$0")"
 
-# Check if ANTHROPIC_API_KEY is set
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-    echo "Error: ANTHROPIC_API_KEY environment variable is not set"
-    echo "Please set it with: export ANTHROPIC_API_KEY='your-api-key'"
-    exit 1
-fi
-
 # Check if virtual environment exists
 if [ ! -d ".venv" ]; then
     echo "Virtual environment not found. Please run ./setup-local.sh first"
@@ -29,6 +22,16 @@ if [ ! -f config.toml ]; then
     cp config.example.toml config.toml
     echo "Please edit config.toml and configure your MCP servers"
     exit 1
+fi
+
+# Check if ANTHROPIC_API_KEY is set when using Anthropic provider
+if grep -q '^provider = "anthropic"' config.toml; then
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
+        echo "Error: ANTHROPIC_API_KEY environment variable is not set"
+        echo "Please set it with: export ANTHROPIC_API_KEY='your-api-key'"
+        echo "Or switch to a different provider (ollama, openai, vllm) in config.toml"
+        exit 1
+    fi
 fi
 
 # Create logs directory if it doesn't exist

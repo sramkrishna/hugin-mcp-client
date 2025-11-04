@@ -3,6 +3,8 @@
 import asyncio
 import logging
 import os
+import subprocess
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mcp import ClientSession, StdioServerParameters
@@ -25,6 +27,18 @@ class MCPClient:
             env: Optional environment variables (defaults to current environment)
         """
         server_env = dict(os.environ)
+
+        # Set LOG_LEVEL to WARNING to suppress INFO messages from MCP servers
+        # This prevents server logs from cluttering the console
+        if "LOG_LEVEL" not in server_env:
+            server_env["LOG_LEVEL"] = "WARNING"
+
+        # Optional: Redirect MCP server logs to a file
+        # Create logs directory if it doesn't exist
+        log_dir = Path.cwd() / "logs"
+        log_dir.mkdir(exist_ok=True)
+        server_env["LOG_FILE"] = str(log_dir / "mcp_servers.log")
+
         if env:
             server_env.update(env)
 
@@ -35,6 +49,8 @@ class MCPClient:
         )
         self.session: Optional[ClientSession] = None
         self._client_context = None
+        self._reconnect_attempts = 0
+        self._max_reconnect_attempts = 3
 
     async def connect(self) -> None:
         """Connect to the MCP server."""
@@ -52,12 +68,57 @@ class MCPClient:
 
     async def disconnect(self) -> None:
         """Disconnect from the MCP server."""
-        if self.session:
-            await self.session.__aexit__(None, None, None)
-        if self._client_context:
-            await self._client_context.__aexit__(None, None, None)
+        try:
+            if self.session:
+                try:
+                    await self.session.__aexit__(None, None, None)
+                except (Exception, asyncio.CancelledError) as e:
+                    logger.debug(f"Error closing session: {e}")
+                finally:
+                    self.session = None
+        finally:
+            if self._client_context:
+                try:
+                    await self._client_context.__aexit__(None, None, None)
+                except (Exception, asyncio.CancelledError) as e:
+                    logger.debug(f"Error closing client context: {e}")
+                finally:
+                    self._client_context = None
 
         logger.info("Disconnected from MCP server")
+
+    def is_connected(self) -> bool:
+        """Check if connected to the MCP server."""
+        return self.session is not None and self._client_context is not None
+
+    async def reconnect(self) -> bool:
+        """
+        Attempt to reconnect to the MCP server.
+
+        Returns:
+            True if reconnection successful, False otherwise
+        """
+        if self._reconnect_attempts >= self._max_reconnect_attempts:
+            logger.error(f"Max reconnection attempts ({self._max_reconnect_attempts}) reached")
+            return False
+
+        self._reconnect_attempts += 1
+        logger.warning(f"Attempting to reconnect (attempt {self._reconnect_attempts}/{self._max_reconnect_attempts})...")
+
+        try:
+            # Clean up old connection
+            await self.disconnect()
+            # Give the server a moment to fully shutdown
+            await asyncio.sleep(1)
+            # Try to reconnect
+            await self.connect()
+            # Reset reconnect counter on success
+            self._reconnect_attempts = 0
+            logger.info("Reconnection successful")
+            return True
+        except Exception as e:
+            logger.error(f"Reconnection failed: {e}")
+            return False
 
     async def list_resources(self) -> List[types.Resource]:
         """List available resources from the server."""

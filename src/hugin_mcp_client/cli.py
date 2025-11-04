@@ -70,7 +70,7 @@ async def main_async() -> None:
         model = llm_config.get("model", "llama3.2")
         base_url = llm_config.get("base_url", "http://localhost:11434")
         llm_client = OllamaProvider(model=model, base_url=base_url)
-        console.print(f"[green]Using Ollama provider with model: {model}[/green]")
+        console.print(f"[green]✓ Using Ollama: {model} @ {base_url}[/green]")
     elif provider == "openai":
         model = llm_config.get("model", "gpt-4")
         api_key = llm_config.get("api_key") or os.getenv("OPENAI_API_KEY")

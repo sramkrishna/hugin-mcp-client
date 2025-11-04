@@ -70,10 +70,71 @@ class OllamaProvider(LLMProvider):
         # Add user message to history
         self.add_user_message(user_message)
 
+        # Build system message for tool usage guidance
+        from datetime import datetime
+        now = datetime.now()
+
+        system_message = (
+            f"Current date: {now.strftime('%A, %B %d, %Y')}\n\n"
+            "CRITICAL TOOL USAGE RULES - READ CAREFULLY:\n\n"
+            "Planify Tasks (ABSOLUTE RULE - QWEN3 SPECIFIC):\n"
+            "WORKFLOW FOR ANY TASK QUERY:\n"
+            "1. ALWAYS call query_planify_tasks(completed=false) with NO OTHER PARAMETERS\n"
+            "2. You will get ALL uncompleted tasks with their due_date fields\n"
+            "3. Filter the results yourself in your response based on dates\n"
+            "\n"
+            "NEVER use these parameters (they cause 0 results):\n"
+            "  X due_date - BROKEN for ranges, only works for exact dates\n"
+            "  X has_due_date - Not needed, you'll see all tasks anyway\n"
+            "\n"
+            "ONLY use completed=false, that's it!\n"
+            "\n"
+            "Examples:\n"
+            "  User: 'todos this week' → query_planify_tasks(completed=false)\n"
+            "  User: 'upcoming tasks' → query_planify_tasks(completed=false)\n"
+            "  User: 'overdue tasks' → query_planify_tasks(completed=false)\n"
+            "  Then YOU filter by due_date in the response\n\n"
+            "Calendar Events:\n"
+            "- Parameter name is 'start_date' (NOT 'date')\n"
+            "- For 'today': use start_date='today' to get events from midnight\n"
+            "- Omitting start_date defaults to 'now' and misses earlier events\n\n"
+            "Email Queries (CRITICAL - MOST IMPORTANT RULE):\n"
+            "- ALWAYS call get_email_accounts FIRST to see all available accounts\n"
+            "- Evolution uses account_id hashes internally, NOT email addresses\n"
+            "- Map user's request to the correct email address:\n"
+            "  * 'gmail' or 'personal' → sriram.ramkrishna@gmail.com (302k emails)\n"
+            "  * 'open source' or 'oss' or 'ramkrishna.me' → sri@ramkrishna.me (131k emails)\n"
+            "  * 'hotmail' or 'microsoft' → sribabe@hotmail.com (269 emails, Microsoft account only)\n"
+            "  * Specific email like 'sriram.ramkrishna@gmail.com' → match exactly\n"
+            "  * If ambiguous, ask user to clarify\n"
+            "- Then pass the matched account_id to query_emails\n"
+            "- DO NOT default to first account - always match the user's intent\n"
+            "- Example flow:\n"
+            "  User: 'emails from gmail'\n"
+            "  1. Call get_email_accounts → see sriram.ramkrishna@gmail.com (account_id: 6f004791...)\n"
+            "  2. Call query_emails(account_id='6f004791b4e0c360459fef2770ce1da49755fea6', limit=10)\n\n"
+            "PROACTIVE EVENT AWARENESS:\n"
+            "- At the start of conversations (first user message), check for recent CalGator events\n"
+            "- Use search_memories tool with query='calgator event' to find recent events\n"
+            "- If you find interesting events from the past few days, mention them naturally:\n"
+            "  'By the way, I noticed an interesting AI conference coming up...'\n"
+            "- Don't be pushy - only mention if genuinely relevant to the user's interests\n"
+            "- CalGator events are stored in Muninn with event_type='calgator_event'\n"
+            "- Events include: title, link, published date, and summary"
+        )
+
+        # Inject system message as first message if not already present
+        messages = self.conversation_history.copy()
+        if not messages or messages[0].get("role") != "system":
+            messages.insert(0, {"role": "system", "content": system_message})
+        else:
+            # Update existing system message
+            messages[0] = {"role": "system", "content": system_message}
+
         # Build request
         request_data = {
             "model": self.model,
-            "messages": self.conversation_history,
+            "messages": messages,
             "stream": False,
             "options": {
                 "num_predict": max_tokens,
@@ -98,6 +159,17 @@ class OllamaProvider(LLMProvider):
             logger.info(f"Received response from Ollama: {result.get('message', {}).get('role', 'unknown')}")
             return result
 
+        except httpx.ConnectError as e:
+            error_msg = (
+                f"Cannot connect to Ollama at {self.base_url}. "
+                f"Please check that:\n"
+                f"  1. Ollama is running on the remote machine\n"
+                f"  2. It's configured to listen on 0.0.0.0 (not just 127.0.0.1)\n"
+                f"  3. The machine is accessible on the network\n"
+                f"Original error: {e}"
+            )
+            logger.error(error_msg)
+            raise ConnectionError(error_msg) from e
         except httpx.HTTPStatusError as e:
             logger.error(f"Ollama API error: {e}")
             raise
@@ -134,7 +206,7 @@ class OllamaProvider(LLMProvider):
                 }
             )
 
-        logger.info(f"Extracted {len(tool_calls)} tool calls from Ollama")
+        logger.debug(f"Extracted {len(tool_calls)} structured tool calls from Ollama")
         return tool_calls
 
     def add_tool_result(

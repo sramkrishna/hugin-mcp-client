@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from .llm_provider import LLMProvider
 from .mcp_client import MCPClient
 from .builtin_tools import BuiltinTools
+from .tool_call_sanitizer import ToolCallSanitizer
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,9 @@ class Orchestrator:
                         simplified_event["location"] = event["location"]
                     if event.get("recurring"):
                         simplified_event["recurring"] = True
+                    if event.get("attendees"):
+                        # CRITICAL: Include attendees for filtering by person
+                        simplified_event["attendees"] = event["attendees"]
 
                     # Add event to the day
                     events_by_day[date_part]["day_of_week"] = day_of_week
@@ -148,6 +152,64 @@ class Orchestrator:
 
         except Exception as e:
             logger.error(f"Error simplifying calendar result: {e}")
+            # Fall back to compression if simplification fails
+            return self._compress_result(result)
+
+    def _simplify_planify_result(self, result: str) -> str:
+        """
+        Simplify Planify task results by removing verbose fields.
+        This prevents truncation while keeping all tasks intact.
+
+        Args:
+            result: Raw Planify JSON result
+
+        Returns:
+            Simplified Planify JSON with only essential task fields
+        """
+        import json
+
+        try:
+            data = json.loads(result)
+
+            # Handle different response structures
+            tasks = data.get("tasks", [])
+            if not tasks:
+                # Check if this is a single task response
+                if "task" in data:
+                    tasks = [data["task"]]
+                else:
+                    return result  # Return as-is if no tasks
+
+            # Simplify each task - keep only essential fields
+            simplified_tasks = []
+            for task in tasks:
+                simplified_task = {
+                    "id": task.get("id"),
+                    "content": task.get("content"),
+                    "due_date": task.get("due_date"),
+                    "checked": task.get("checked"),
+                    "project_name": task.get("project_name"),
+                    "priority": task.get("priority"),
+                }
+
+                # Only include labels if present and non-empty
+                if task.get("labels"):
+                    simplified_task["labels"] = task["labels"]
+
+                simplified_tasks.append(simplified_task)
+
+            # Build simplified response
+            simplified = {
+                "total_tasks": data.get("total_tasks", len(simplified_tasks)),
+                "tasks": simplified_tasks
+            }
+
+            result_json = json.dumps(simplified, indent=2)
+            logger.debug(f"Simplified Planify result from {len(result)} to {len(result_json)} chars")
+            return result_json
+
+        except Exception as e:
+            logger.error(f"Error simplifying Planify result: {e}")
             # Fall back to compression if simplification fails
             return self._compress_result(result)
 
@@ -213,13 +275,16 @@ class Orchestrator:
                 tools=self.available_tools,
             )
 
-            # Check if LLM wants to use tools
-            tool_calls = self.llm.extract_tool_calls(response)
-            logger.info(f"Iteration {iteration}: Found {len(tool_calls)} tool calls")
-
-            # Also check if there's text content
+            # Extract text content first
             text_content = self.llm.extract_text_response(response)
             logger.info(f"Iteration {iteration}: Text content length: {len(text_content)}")
+
+            # Check if LLM wants to use tools
+            raw_tool_calls = self.llm.extract_tool_calls(response)
+
+            # Sanitize tool calls - handle models that output JSON in text
+            tool_calls = ToolCallSanitizer.sanitize(raw_tool_calls, text_content)
+            logger.info(f"Iteration {iteration}: Found {len(tool_calls)} tool calls")
 
             if tool_calls:
                 logger.info("LLM requested tool use")
@@ -238,7 +303,7 @@ class Orchestrator:
                     tool_input = tool_call["input"]
                     tool_id = tool_call["id"]
 
-                    logger.info(f"Executing tool: {tool_name}")
+                    logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
 
                     # Check if this is a built-in tool
                     if tool_name.startswith("hugin_"):
@@ -306,11 +371,19 @@ class Orchestrator:
                                 result = f"Error calling tool: {str(e)}"
 
                         # Compress result before adding to conversation
-                        # EXCEPTION: Don't compress calendar results - structured JSON loses meaning when truncated
-                        if actual_tool_name == "query_calendar_events":
+                        # EXCEPTION: Don't compress calendar/planify results - structured JSON loses meaning when truncated
+                        if "calendar_events" in actual_tool_name:
                             # Simplify calendar data to reduce token usage and improve accuracy
-                            compressed_result = self._simplify_calendar_result(result)
-                            logger.info(f"Calendar result simplified from {len(result)} to {len(compressed_result)} chars")
+                            simplified = self._simplify_calendar_result(result)
+                            logger.info(f"Calendar result simplified from {len(result)} to {len(simplified)} chars")
+                            # Don't compress calendar data further - we need all events
+                            compressed_result = simplified
+                        elif "planify" in actual_tool_name:
+                            # Simplify Planify data to prevent truncation confusion
+                            simplified = self._simplify_planify_result(result)
+                            logger.info(f"Planify result simplified from {len(result)} to {len(simplified)} chars")
+                            # Don't compress Planify data further - we need all tasks
+                            compressed_result = simplified
                         else:
                             compressed_result = self._compress_result(result)
                             if len(compressed_result) < len(result):

@@ -32,6 +32,7 @@ dependencies = [
     "pydantic>=2.0.0,<3.0.0",
     "anyio>=3.0.0,<5.0.0",
     "rich>=13.0.0",  # For nice CLI output
+    "prompt_toolkit>=3.0.0",  # For better input handling with line wrapping
 ]
 
 [project.optional-dependencies]

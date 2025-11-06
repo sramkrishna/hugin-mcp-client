@@ -9,6 +9,9 @@ from typing import Optional
 
 import tomllib
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.styles import Style
+from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -17,6 +20,7 @@ from .llm_client import LLMClient, AnthropicProvider
 from .logging_config import setup_logging
 from .ollama_provider import OllamaProvider
 from .openai_provider import OpenAIProvider
+from .openvino_provider import OpenVINOProvider
 from .mcp_client import MCPClient
 from .orchestrator import Orchestrator
 
@@ -109,6 +113,22 @@ async def main_async() -> None:
             gpu_memory_utilization=gpu_memory_utilization,
         )
         console.print(f"[green]Using vLLM provider with model: {model}[/green]")
+    elif provider == "openvino":
+        model_path = llm_config.get("model_path")
+        if not model_path:
+            # Default to the model we just exported
+            model_path = str(Path.home() / "models" / "qwen2.5-coder-3b-openvino")
+
+        device = llm_config.get("device", "NPU")  # Default to NPU
+        max_new_tokens = llm_config.get("max_new_tokens", 2048)
+
+        console.print(f"[yellow]Loading OpenVINO model (this may take a minute)...[/yellow]")
+        llm_client = OpenVINOProvider(
+            model_path=model_path,
+            device=device,
+            max_new_tokens=max_new_tokens,
+        )
+        console.print(f"[green]✓ Using OpenVINO on {device}: {Path(model_path).name}[/green]")
     elif provider == "anthropic":
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
@@ -165,9 +185,18 @@ async def main_async() -> None:
             "Commands: 'exit' to quit, 'clear' to reset, 'tokens' to see usage[/yellow]\n"
         )
 
+        # Create a prompt session for async input
+        session = PromptSession(
+            style=Style.from_dict({
+                'prompt': '#00aa00 bold',  # Green color for prompt
+            })
+        )
+
         while True:
             try:
-                user_input = console.input("[bold green]You:[/bold green] ")
+                # Use prompt_toolkit async for better input handling with line wrapping
+                with patch_stdout():
+                    user_input = await session.prompt_async("You: ")
 
                 if user_input.lower() in ["exit", "quit", "q"]:
                     break

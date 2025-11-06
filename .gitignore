@@ -61,3 +61,12 @@ Thumbs.db
 # logs
 logs/
 *.log
+
+# Test files and experimental code
+/test_*.py
+/test_*.txt
+/*_analysis.txt
+/agents/
+/populate_*.py
+/muninn_patterns.json
+tests/archive/

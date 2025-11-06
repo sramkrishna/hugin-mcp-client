@@ -3,11 +3,82 @@
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
+from urllib.parse import quote_plus
+from urllib.request import Request, urlopen
+from html.parser import HTMLParser
 
 logger = logging.getLogger(__name__)
+
+
+class DuckDuckGoSearchParser(HTMLParser):
+    """Parse DuckDuckGo HTML search results."""
+
+    def __init__(self):
+        super().__init__()
+        self.results = []
+        self.current_result = {}
+        self.in_result = False
+        self.in_title = False
+        self.in_snippet = False
+        self.capture_data = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+
+        # Result container
+        if tag == 'article' or (tag == 'div' and 'data-testid' in attrs_dict and 'result' in attrs_dict.get('data-testid', '')):
+            self.in_result = True
+            self.current_result = {}
+
+        # Title link
+        if self.in_result and tag == 'a' and 'href' in attrs_dict:
+            href = attrs_dict['href']
+            # DuckDuckGo wraps URLs, extract actual URL
+            if href.startswith('//duckduckgo.com/l/'):
+                # Extract uddg parameter which contains the actual URL
+                import urllib.parse
+                params = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+                if 'uddg' in params:
+                    href = params['uddg'][0]
+            if href and not href.startswith('//duckduckgo.com'):
+                self.current_result['url'] = href
+                self.in_title = True
+                self.capture_data = True
+
+        # Snippet/description
+        if self.in_result and tag == 'span' and attrs_dict.get('class', '').find('snippet') != -1:
+            self.in_snippet = True
+            self.capture_data = True
+
+    def handle_endtag(self, tag):
+        if tag == 'article' or tag == 'div':
+            if self.in_result and self.current_result.get('url'):
+                self.results.append(self.current_result.copy())
+            self.in_result = False
+            self.current_result = {}
+
+        if tag == 'a' and self.in_title:
+            self.in_title = False
+            self.capture_data = False
+
+        if tag == 'span' and self.in_snippet:
+            self.in_snippet = False
+            self.capture_data = False
+
+    def handle_data(self, data):
+        data = data.strip()
+        if not data:
+            return
+
+        if self.capture_data:
+            if self.in_title and 'title' not in self.current_result:
+                self.current_result['title'] = data
+            elif self.in_snippet and 'snippet' not in self.current_result:
+                self.current_result['snippet'] = data
 
 
 class BuiltinTools:
@@ -39,7 +110,7 @@ class BuiltinTools:
                                 "- 'today', 'yesterday'\n"
                                 "- 'this week', 'last week', 'this month', 'last month'\n"
                                 "- 'last N weeks', 'last N months' (e.g., 'last 2 weeks')\n"
-                                "- 'past N days' (e.g., 'past 7 days')\n"
+                                "- 'past N days', 'past N weeks', 'past N months' (e.g., 'past 7 days', 'past 4 weeks')\n"
                                 "- 'N weeks ago', 'N months ago' (e.g., '2 weeks ago')\n"
                                 "- 'last monday', 'last tuesday', etc. (most recent occurrence)\n"
                                 "- 'this monday', 'this tuesday', etc. (in current week)"
@@ -86,6 +157,33 @@ class BuiltinTools:
                     },
                     "required": ["file_path", "content"],
                 },
+            },
+            {
+                "name": "hugin_web_search",
+                "description": (
+                    "Search the web using DuckDuckGo and return a list of results. "
+                    "Useful for finding information about healthcare providers, websites, "
+                    "products, services, or any general web information. "
+                    "Returns titles, URLs, and snippets for each result."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The search query (e.g., 'pediatric neurologist Boston' or 'NeuroSports clinic')",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of results to return (default: 10, max: 20)",
+                        },
+                        "region": {
+                            "type": "string",
+                            "description": "Region code for localized results (e.g., 'us-en', 'uk-en', 'wt-wt' for global). Default: 'us-en'",
+                        },
+                    },
+                    "required": ["query"],
+                },
             }
         ]
 
@@ -108,6 +206,8 @@ class BuiltinTools:
             return await BuiltinTools._calculate_date_range(arguments)
         elif tool_name == "hugin_write_file":
             return await BuiltinTools._write_file(arguments)
+        elif tool_name == "hugin_web_search":
+            return await BuiltinTools._web_search(arguments)
         else:
             raise ValueError(f"Unknown built-in tool: {tool_name}")
 
@@ -162,7 +262,7 @@ class BuiltinTools:
             return json.dumps({
                 "error": str(e),
                 "period": period,
-                "hint": "Try: 'today', 'yesterday', 'this week', 'last week', 'this month', 'last month', 'past 7 days', 'last 2 weeks', etc."
+                "hint": "Try: 'today', 'yesterday', 'this week', 'last week', 'this month', 'last month', 'past 7 days', 'past 4 weeks', 'last 2 weeks', etc."
             })
 
     @staticmethod
@@ -329,6 +429,31 @@ class BuiltinTools:
             except (ValueError, IndexError):
                 raise ValueError(f"Invalid format: '{period}'. Use 'past N days' where N is a number.")
 
+        # "past N weeks" - including current week (rolling N weeks)
+        elif period.startswith("past ") and "week" in period:
+            try:
+                parts = period.split()
+                num_weeks = int(parts[1])
+                # Past N weeks = N * 7 days back to today
+                start_date = ref_date - timedelta(days=num_weeks * 7 - 1)
+                end_date = ref_date
+                return start_date, end_date, f"Past {num_weeks} weeks"
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid format: '{period}'. Use 'past N weeks' where N is a number.")
+
+        # "past N months" - rolling N months including current date
+        elif period.startswith("past ") and "month" in period:
+            try:
+                parts = period.split()
+                num_months = int(parts[1])
+                # Go back N months from current date (not month boundaries)
+                # Approximate: 30 days per month
+                start_date = ref_date - timedelta(days=num_months * 30)
+                end_date = ref_date
+                return start_date, end_date, f"Past {num_months} months (approx)"
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid format: '{period}'. Use 'past N months' where N is a number.")
+
         # "N weeks ago" - specific week N weeks back
         elif "week" in period and "ago" in period:
             try:
@@ -362,9 +487,116 @@ class BuiltinTools:
             raise ValueError(
                 f"Unrecognized period format: '{period}'. "
                 "Supported: today, yesterday, this week, last week, this month, last month, "
-                "last N weeks, last N months, past N days, N weeks ago, N months ago, "
-                "last monday/tuesday/etc., this monday/tuesday/etc."
+                "last N weeks, last N months, past N days, past N weeks, past N months, "
+                "N weeks ago, N months ago, last monday/tuesday/etc., this monday/tuesday/etc."
             )
+
+    @staticmethod
+    async def _web_search(arguments: Dict[str, Any]) -> str:
+        """
+        Search the web using DuckDuckGo.
+
+        Args:
+            arguments: Dict with 'query', optional 'max_results' and 'region'
+
+        Returns:
+            JSON string with search results
+        """
+        query = arguments.get("query", "").strip()
+        max_results = min(arguments.get("max_results", 10), 20)  # Cap at 20
+        region = arguments.get("region", "us-en")
+
+        if not query:
+            return json.dumps({
+                "error": "query is required",
+                "results": []
+            })
+
+        try:
+            # Build DuckDuckGo search URL
+            search_url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}&kl={region}"
+
+            # Create request with headers to mimic browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+
+            request = Request(search_url, headers=headers)
+
+            logger.info(f"Searching DuckDuckGo for: '{query}' (region: {region}, max: {max_results})")
+
+            # Fetch search results
+            with urlopen(request, timeout=10) as response:
+                html_content = response.read().decode('utf-8')
+
+            # Parse results - DuckDuckGo uses result divs with links containing uddg parameter
+            results = []
+
+            # Find all result blocks
+            result_blocks = re.findall(
+                r'<div class="result[^"]*"[^>]*>.*?</div>(?=<div class="result|<div id=|$)',
+                html_content,
+                re.DOTALL
+            )
+
+            for block in result_blocks:
+                if len(results) >= max_results:
+                    break
+
+                # Extract URL with uddg parameter
+                url_match = re.search(r'href="//duckduckgo\.com/l/\?[^"]*uddg=([^"&]+)', block)
+                if not url_match:
+                    continue
+
+                # Decode the URL
+                from urllib.parse import unquote
+                url = unquote(url_match.group(1))
+
+                # Extract title - look for link text
+                title_match = re.search(r'<a[^>]+class="[^"]*result__a[^"]*"[^>]*>([^<]+)</a>', block)
+                title = title_match.group(1).strip() if title_match else "No title"
+
+                # Extract snippet
+                snippet_match = re.search(r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([^<]+)</a>', block)
+                snippet = snippet_match.group(1).strip() if snippet_match else ""
+
+                # Clean up HTML entities
+                title = title.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+                snippet = snippet.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+
+                # Remove excessive whitespace
+                title = ' '.join(title.split())
+                snippet = ' '.join(snippet.split())
+
+                results.append({
+                    "title": title,
+                    "url": url,
+                    "snippet": snippet
+                })
+
+            logger.info(f"Found {len(results)} search results for '{query}'")
+
+            return json.dumps({
+                "query": query,
+                "results": results,
+                "count": len(results),
+                "region": region
+            }, indent=2)
+
+        except Exception as e:
+            error_msg = f"Error searching web: {str(e)}"
+            logger.error(error_msg)
+            return json.dumps({
+                "error": error_msg,
+                "query": query,
+                "results": [],
+                "exception_type": type(e).__name__
+            })
 
     @staticmethod
     async def _write_file(arguments: Dict[str, Any]) -> str:

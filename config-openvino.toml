@@ -1,0 +1,16 @@
+# Hugin with OpenVINO Configuration (for offline/travel usage)
+
+[llm]
+provider = "openvino"
+model_path = "~/models/qwen2.5-coder-3b-openvino"
+device = "GPU"  # Using GPU instead of NPU due to driver issues on Linux
+max_new_tokens = 2048
+
+# MCP Servers - minimal setup for testing
+[servers.muninn]
+command = "/var/home/sri/Projects/muninn-mcp-server/.venv/bin/python"
+args = ["-m", "muninn_mcp_server.server"]
+
+[servers.ratatoskr]
+command = "/var/home/sri/Projects/ratatoskr-mcp-server/.venv/bin/python"
+args = ["/var/home/sri/Projects/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py"]

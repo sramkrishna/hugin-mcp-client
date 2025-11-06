@@ -4,3 +4,6 @@
 [submodule "servers/muninn"]
 	path = servers/muninn
 	url = https://github.com/sramkrishna/muninn-mcp-server.git
+[submodule "servers/yggdrasil"]
+	path = servers/yggdrasil
+	url = https://github.com/sramkrishna/yggdrasil-mcp-server.git

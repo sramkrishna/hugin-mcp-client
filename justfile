@@ -100,6 +100,11 @@ run-plain:
 prompt PROMPT:
     @.venv/bin/hugin --prompt "{{PROMPT}}" --output-only 2>/dev/null
 
+# Run Hugin with a single prompt with markdown formatting (no raw output)
+# Example: just prompt-formatted "What's on my calendar?"
+prompt-formatted PROMPT:
+    @.venv/bin/hugin --prompt "{{PROMPT}}" 2>/dev/null
+
 # Run tests
 test:
     .venv/bin/pytest tests/ -v

@@ -184,6 +184,36 @@ class BuiltinTools:
                     },
                     "required": ["query"],
                 },
+            },
+            {
+                "name": "hugin_execute_command",
+                "description": (
+                    "Execute a shell command or script in a safe manner. Useful for running Python scripts, "
+                    "processing data, executing system commands, or any task that requires command-line execution. "
+                    "Commands run in the current working directory with a 5-minute timeout. "
+                    "IMPORTANT: Only use for safe, non-destructive commands. Avoid rm, dd, mkfs, or network modification commands."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": (
+                                "The command to execute. Can be a shell command, script path, or command with arguments. "
+                                "Examples: 'python3 script.py', 'ls -lh /path', './process_data.sh'"
+                            ),
+                        },
+                        "working_dir": {
+                            "type": "string",
+                            "description": "Optional working directory for command execution (defaults to current directory)",
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Maximum execution time in seconds (default: 300, max: 600)",
+                        },
+                    },
+                    "required": ["command"],
+                },
             }
         ]
 
@@ -208,6 +238,8 @@ class BuiltinTools:
             return await BuiltinTools._write_file(arguments)
         elif tool_name == "hugin_web_search":
             return await BuiltinTools._web_search(arguments)
+        elif tool_name == "hugin_execute_command":
+            return await BuiltinTools._execute_command(arguments)
         else:
             raise ValueError(f"Unknown built-in tool: {tool_name}")
 
@@ -537,12 +569,10 @@ class BuiltinTools:
             # Parse results - DuckDuckGo uses result divs with links containing uddg parameter
             results = []
 
-            # Find all result blocks
-            result_blocks = re.findall(
-                r'<div class="result[^"]*"[^>]*>.*?</div>(?=<div class="result|<div id=|$)',
-                html_content,
-                re.DOTALL
-            )
+            # Updated regex to handle current DuckDuckGo HTML structure
+            # Results are in divs with classes like "result results_links results_links_deep web-result"
+            result_pattern = r'<div[^>]+class="[^"]*result[^"]*"[^>]*>(.*?)</div>\s*(?=<div[^>]+class="[^"]*result|<div id=|$)'
+            result_blocks = re.findall(result_pattern, html_content, re.DOTALL)
 
             for block in result_blocks:
                 if len(results) >= max_results:
@@ -557,21 +587,34 @@ class BuiltinTools:
                 from urllib.parse import unquote
                 url = unquote(url_match.group(1))
 
-                # Extract title - look for link text
-                title_match = re.search(r'<a[^>]+class="[^"]*result__a[^"]*"[^>]*>([^<]+)</a>', block)
-                title = title_match.group(1).strip() if title_match else "No title"
+                # Extract title - look for link text (more flexible pattern)
+                title_match = re.search(r'<a[^>]+class="[^"]*result[^"]*"[^>]*>(.+?)</a>', block, re.DOTALL)
+                if title_match:
+                    title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                else:
+                    title = "No title"
 
-                # Extract snippet
-                snippet_match = re.search(r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([^<]+)</a>', block)
-                snippet = snippet_match.group(1).strip() if snippet_match else ""
+                # Extract snippet - look for snippet class or fallback to text after title
+                snippet_match = re.search(r'class="[^"]*snippet[^"]*"[^>]*>(.+?)</(?:a|span)>', block, re.DOTALL)
+                if snippet_match:
+                    snippet = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
+                else:
+                    # Fallback: extract any text content
+                    snippet_text = re.sub(r'<[^>]+>', ' ', block)
+                    snippet = ' '.join(snippet_text.split())[:200]
 
                 # Clean up HTML entities
-                title = title.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
-                snippet = snippet.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+                import html as html_lib
+                title = html_lib.unescape(title)
+                snippet = html_lib.unescape(snippet)
 
                 # Remove excessive whitespace
                 title = ' '.join(title.split())
                 snippet = ' '.join(snippet.split())
+
+                # Skip if we don't have meaningful content
+                if not title or title == "No title":
+                    continue
 
                 results.append({
                     "title": title,
@@ -695,4 +738,121 @@ class BuiltinTools:
                 "error": error_msg,
                 "success": False,
                 "exception_type": type(e).__name__
+            })
+
+    @staticmethod
+    async def _execute_command(arguments: Dict[str, Any]) -> str:
+        """
+        Execute a shell command safely.
+
+        Args:
+            arguments: Dict with 'command', optional 'working_dir' and 'timeout'
+
+        Returns:
+            JSON string with command output and return code
+        """
+        import subprocess
+        import asyncio
+
+        command = arguments.get("command", "").strip()
+        working_dir = arguments.get("working_dir")
+        timeout = min(arguments.get("timeout", 300), 600)  # Max 10 minutes
+
+        if not command:
+            return json.dumps({
+                "error": "Command cannot be empty",
+                "success": False
+            })
+
+        # Safety check: block dangerous commands
+        dangerous_patterns = [
+            'rm -rf /',
+            'dd if=',
+            'mkfs',
+            '> /dev/',
+            'chmod 777',
+            'chown -R',
+            'sudo rm',
+            ':(){:|:&};:',  # fork bomb
+        ]
+
+        command_lower = command.lower()
+        for pattern in dangerous_patterns:
+            if pattern.lower() in command_lower:
+                return json.dumps({
+                    "error": f"Blocked dangerous command pattern: {pattern}",
+                    "success": False,
+                    "command": command
+                })
+
+        logger.info(f"Executing command: {command[:100]}... (working_dir: {working_dir}, timeout: {timeout}s)")
+
+        try:
+            # Execute command
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=working_dir
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                return json.dumps({
+                    "error": f"Command timed out after {timeout} seconds",
+                    "success": False,
+                    "command": command,
+                    "timeout": timeout
+                })
+
+            # Decode output
+            stdout_str = stdout.decode('utf-8', errors='replace')
+            stderr_str = stderr.decode('utf-8', errors='replace')
+            return_code = process.returncode
+
+            # Truncate very long output
+            max_output_length = 50000
+            if len(stdout_str) > max_output_length:
+                stdout_str = stdout_str[:max_output_length] + f"\n... (truncated {len(stdout_str) - max_output_length} characters)"
+            if len(stderr_str) > max_output_length:
+                stderr_str = stderr_str[:max_output_length] + f"\n... (truncated {len(stderr_str) - max_output_length} characters)"
+
+            result = {
+                "success": return_code == 0,
+                "return_code": return_code,
+                "stdout": stdout_str,
+                "stderr": stderr_str,
+                "command": command,
+                "working_dir": working_dir or os.getcwd()
+            }
+
+            if return_code == 0:
+                logger.info(f"Command executed successfully (return code: 0)")
+            else:
+                logger.warning(f"Command failed with return code: {return_code}")
+
+            return json.dumps(result, indent=2)
+
+        except FileNotFoundError as e:
+            error_msg = f"Command not found or working directory doesn't exist: {str(e)}"
+            logger.error(error_msg)
+            return json.dumps({
+                "error": error_msg,
+                "success": False,
+                "command": command
+            })
+        except Exception as e:
+            error_msg = f"Unexpected error executing command: {str(e)}"
+            logger.error(error_msg)
+            return json.dumps({
+                "error": error_msg,
+                "success": False,
+                "exception_type": type(e).__name__,
+                "command": command
             })

@@ -1,5 +1,6 @@
 """Command-line interface for Hugin MCP client."""
 
+import argparse
 import asyncio
 import logging
 import os
@@ -34,6 +35,30 @@ except ImportError:
 console = Console()
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Hugin MCP Client - AI assistant with MCP server integration"
+    )
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        help="Run with a single prompt (non-interactive mode)",
+    )
+    parser.add_argument(
+        "--output-only",
+        action="store_true",
+        help="Output only the final response (no logging, no formatting)",
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=50,
+        help="Maximum iterations for tool use (default: 50)",
+    )
+    return parser.parse_args()
+
+
 def load_config() -> dict:
     """Load configuration from config.toml file."""
     config_path = Path.cwd() / "config.toml"
@@ -50,8 +75,97 @@ def load_config() -> dict:
         return {"servers": {}, "llm": {}}
 
 
+def create_llm_provider(llm_config: dict, quiet: bool = False):
+    """Create and initialize LLM provider based on configuration."""
+    provider = llm_config.get("provider", "anthropic")
+
+    if provider == "ollama":
+        model = llm_config.get("model", "llama3.2")
+        base_url = llm_config.get("base_url", "http://localhost:11434")
+        llm_client = OllamaProvider(model=model, base_url=base_url)
+        if not quiet:
+            console.print(f"[green]✓ Using Ollama: {model} @ {base_url}[/green]")
+    elif provider == "openai":
+        model = llm_config.get("model", "gpt-4")
+        api_key = llm_config.get("api_key") or os.getenv("OPENAI_API_KEY")
+        base_url = llm_config.get("base_url")
+
+        if not api_key and not base_url:
+            console.print(
+                "[red]Error: OPENAI_API_KEY not set and no base_url for local server[/red]"
+            )
+            sys.exit(1)
+
+        llm_client = OpenAIProvider(model=model, api_key=api_key, base_url=base_url)
+        if not quiet:
+            if base_url:
+                console.print(f"[green]Using OpenAI-compatible API at {base_url} with model: {model}[/green]")
+            else:
+                console.print(f"[green]Using OpenAI provider with model: {model}[/green]")
+    elif provider == "vllm":
+        if not VLLM_AVAILABLE:
+            console.print("[red]vLLM is not installed. Install it with: pip install 'hugin-mcp-client[vllm]'[/red]")
+            sys.exit(1)
+
+        model = llm_config.get("model")
+        if not model:
+            console.print("[red]Error: 'model' is required for vLLM provider[/red]")
+            sys.exit(1)
+
+        tensor_parallel_size = llm_config.get("tensor_parallel_size", 1)
+        max_model_len = llm_config.get("max_model_len")
+        gpu_memory_utilization = llm_config.get("gpu_memory_utilization", 0.9)
+
+        if not quiet:
+            console.print(f"[yellow]Loading vLLM model (this may take a minute)...[/yellow]")
+        llm_client = VLLMProvider(
+            model=model,
+            tensor_parallel_size=tensor_parallel_size,
+            max_model_len=max_model_len,
+            gpu_memory_utilization=gpu_memory_utilization,
+        )
+        if not quiet:
+            console.print(f"[green]Using vLLM provider with model: {model}[/green]")
+    elif provider == "openvino":
+        model_path = llm_config.get("model_path")
+        if not model_path:
+            model_path = str(Path.home() / "models" / "qwen2.5-coder-3b-openvino")
+
+        device = llm_config.get("device", "NPU")
+        max_new_tokens = llm_config.get("max_new_tokens", 2048)
+
+        if not quiet:
+            console.print(f"[yellow]Loading OpenVINO model (this may take a minute)...[/yellow]")
+        llm_client = OpenVINOProvider(
+            model_path=model_path,
+            device=device,
+            max_new_tokens=max_new_tokens,
+        )
+        if not quiet:
+            console.print(f"[green]✓ Using OpenVINO on {device}: {Path(model_path).name}[/green]")
+    elif provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            console.print(
+                "[red]Error: ANTHROPIC_API_KEY environment variable not set[/red]"
+            )
+            console.print(
+                "Please set it with: export ANTHROPIC_API_KEY='your-api-key-here'"
+            )
+            sys.exit(1)
+        model = llm_config.get("model", "claude-sonnet-4-20250514")
+        llm_client = AnthropicProvider(api_key=api_key, model=model)
+        if not quiet:
+            console.print(f"[green]Using Anthropic provider with model: {model}[/green]")
+    else:
+        console.print(f"[red]Unknown LLM provider: {provider}[/red]")
+        sys.exit(1)
+
+    return llm_client
+
+
 async def main_async() -> None:
-    """Async main function."""
+    """Async main function (interactive mode)."""
     # Setup logging
     log_level = os.getenv("LOG_LEVEL", "INFO")
     log_file = os.getenv("LOG_FILE")
@@ -68,83 +182,7 @@ async def main_async() -> None:
 
     # Initialize LLM provider
     console.print("\n[cyan]Initializing LLM client...[/cyan]")
-    provider = llm_config.get("provider", "anthropic")
-
-    if provider == "ollama":
-        model = llm_config.get("model", "llama3.2")
-        base_url = llm_config.get("base_url", "http://localhost:11434")
-        llm_client = OllamaProvider(model=model, base_url=base_url)
-        console.print(f"[green]✓ Using Ollama: {model} @ {base_url}[/green]")
-    elif provider == "openai":
-        model = llm_config.get("model", "gpt-4")
-        api_key = llm_config.get("api_key") or os.getenv("OPENAI_API_KEY")
-        base_url = llm_config.get("base_url")  # Optional, for local servers
-
-        if not api_key and not base_url:
-            console.print(
-                "[red]Error: OPENAI_API_KEY not set and no base_url for local server[/red]"
-            )
-            sys.exit(1)
-
-        llm_client = OpenAIProvider(model=model, api_key=api_key, base_url=base_url)
-        if base_url:
-            console.print(f"[green]Using OpenAI-compatible API at {base_url} with model: {model}[/green]")
-        else:
-            console.print(f"[green]Using OpenAI provider with model: {model}[/green]")
-    elif provider == "vllm":
-        if not VLLM_AVAILABLE:
-            console.print("[red]vLLM is not installed. Install it with: pip install 'hugin-mcp-client[vllm]'[/red]")
-            sys.exit(1)
-
-        model = llm_config.get("model")
-        if not model:
-            console.print("[red]Error: 'model' is required for vLLM provider[/red]")
-            sys.exit(1)
-
-        tensor_parallel_size = llm_config.get("tensor_parallel_size", 1)
-        max_model_len = llm_config.get("max_model_len")
-        gpu_memory_utilization = llm_config.get("gpu_memory_utilization", 0.9)
-
-        console.print(f"[yellow]Loading vLLM model (this may take a minute)...[/yellow]")
-        llm_client = VLLMProvider(
-            model=model,
-            tensor_parallel_size=tensor_parallel_size,
-            max_model_len=max_model_len,
-            gpu_memory_utilization=gpu_memory_utilization,
-        )
-        console.print(f"[green]Using vLLM provider with model: {model}[/green]")
-    elif provider == "openvino":
-        model_path = llm_config.get("model_path")
-        if not model_path:
-            # Default to the model we just exported
-            model_path = str(Path.home() / "models" / "qwen2.5-coder-3b-openvino")
-
-        device = llm_config.get("device", "NPU")  # Default to NPU
-        max_new_tokens = llm_config.get("max_new_tokens", 2048)
-
-        console.print(f"[yellow]Loading OpenVINO model (this may take a minute)...[/yellow]")
-        llm_client = OpenVINOProvider(
-            model_path=model_path,
-            device=device,
-            max_new_tokens=max_new_tokens,
-        )
-        console.print(f"[green]✓ Using OpenVINO on {device}: {Path(model_path).name}[/green]")
-    elif provider == "anthropic":
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            console.print(
-                "[red]Error: ANTHROPIC_API_KEY environment variable not set[/red]"
-            )
-            console.print(
-                "Please set it with: export ANTHROPIC_API_KEY='your-api-key-here'"
-            )
-            sys.exit(1)
-        model = llm_config.get("model", "claude-sonnet-4-20250514")
-        llm_client = AnthropicProvider(api_key=api_key, model=model)
-        console.print(f"[green]Using Anthropic provider with model: {model}[/green]")
-    else:
-        console.print(f"[red]Unknown LLM provider: {provider}[/red]")
-        sys.exit(1)
+    llm_client = create_llm_provider(llm_config)
 
     # Load and configure MCP servers from config file
     mcp_clients = {}
@@ -311,8 +349,75 @@ async def main_async() -> None:
         console.print("[green]✓ Goodbye![/green]")
 
 
+async def main_non_interactive(args) -> None:
+    """Non-interactive mode - single prompt, output to stdout."""
+    # Suppress logging if --output-only
+    if args.output_only:
+        logging.disable(logging.CRITICAL)
+    else:
+        log_level = os.getenv("LOG_LEVEL", "INFO")
+        log_file = os.getenv("LOG_FILE")
+        setup_logging(level=log_level, log_file=log_file, enable_console=False)
+
+    config = load_config()
+    llm_config = config.get("llm", {})
+    server_configs = config.get("servers", {})
+
+    # Initialize LLM provider (quiet mode)
+    llm_client = create_llm_provider(llm_config, quiet=args.output_only)
+
+    # Initialize MCP clients
+    mcp_clients = {}
+    for name, server_config in server_configs.items():
+        if "command" not in server_config:
+            continue
+        mcp_clients[name] = MCPClient(
+            server_command=server_config["command"],
+            server_args=server_config.get("args", []),
+        )
+
+    # Initialize orchestrator
+    max_result_length = llm_config.get("max_result_length", 10000)
+    orchestrator = Orchestrator(llm_client, mcp_clients, max_result_length=max_result_length)
+
+    try:
+        await orchestrator.initialize()
+
+        # Process single prompt
+        response = await orchestrator.process_message(
+            args.prompt,
+            max_iterations=args.max_iterations
+        )
+
+        # Output handling
+        if args.output_only:
+            # Raw output only - no formatting
+            print(response)
+        else:
+            # Formatted output with Rich
+            console.print(Markdown(response))
+            # Show token usage
+            if hasattr(llm_client, 'format_token_usage'):
+                token_usage = llm_client.format_token_usage()
+                console.print(f"\n[dim]{token_usage}[/dim]")
+
+    finally:
+        await orchestrator.cleanup()
+
+
 def main() -> None:
     """CLI entry point."""
+    args = parse_args()
+
+    # Non-interactive mode
+    if args.prompt:
+        try:
+            asyncio.run(main_non_interactive(args))
+        except KeyboardInterrupt:
+            sys.exit(1)
+        return
+
+    # Interactive mode (existing behavior)
     try:
         asyncio.run(main_async())
     except KeyboardInterrupt:

@@ -70,3 +70,13 @@ logs/
 /populate_*.py
 /muninn_patterns.json
 tests/archive/
+
+# Personal/medical files (should be in ~/Documents)
+medical_*
+*_medical.*
+generate_timeline*.py
+Aarti*
+POTS*
+aarti*
+pots*
+medical-reports/

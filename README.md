@@ -39,53 +39,31 @@ User Input → Hugin (LLM Client) → Orchestrator → MCP Servers
 
 ## Requirements
 
-- Python 3.9 - 3.13
+- Python 3.13
 - Anthropic API key (for Claude) or Ollama (for local models)
 - Git (for submodules)
+- just (command runner) - optional but recommended
+
+### MCP Server Dependencies
+
+- **Ratatoskr** (GNOME integration): `poppler-utils`, `tesseract` (for PDF OCR)
+- **Yggdrasil** (Git hosting): `glab` (GitLab CLI) for GitLab integration
 
 ## Installation
-
-**Complete Installation (Recommended):**
-
-This will install Hugin and both MCP servers:
 
 ```bash
 # Clone with submodules
 git clone --recursive https://github.com/sramkrishna/hugin-mcp-client.git
 cd hugin-mcp-client
 
-# Run the installer
-./install.sh
+# Setup everything (Hugin + all MCP servers)
+just setup-all
+
+# Copy example configuration
+cp config.example.toml config.toml
+
+# Edit config.toml with your preferences
 ```
-
-**Manual Setup:**
-```bash
-# Initialize submodules
-git submodule update --init --recursive
-
-# Install Hugin
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-
-# Install Ratatoskr
-cd servers/ratatoskr
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-deactivate
-cd ../..
-
-# Install Muninn
-cd servers/muninn
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-deactivate
-cd ../..
-```
-
-**Note:** For MCP servers that need D-Bus access (like Ratatoskr for GNOME integration), Hugin must run directly on the host, not in containers.
 
 ## Configuration
 
@@ -189,13 +167,13 @@ args = ["/path/to/ratatoskr-mcp-server/src/ratatoskr_mcp_server/server.py"]
 ### Interactive CLI
 
 ```bash
-hugin
+just run
 ```
 
-Or:
-
+Or activate the venv manually:
 ```bash
-python -m hugin_mcp_client.cli
+source .venv/bin/activate
+hugin
 ```
 
 ### Example Session

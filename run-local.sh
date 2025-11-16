@@ -46,4 +46,4 @@ echo ""
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export LOG_FILE="${LOG_FILE:-logs/hugin.log}"
 
-hugin
+.venv/bin/hugin

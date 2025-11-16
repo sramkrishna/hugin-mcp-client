@@ -1,21 +1,37 @@
 # Hugin MCP Client - justfile
 # Main AI assistant client that connects to MCP servers
 
-# Python to use (prefer 3.13+)
+# Python to use (requires Python 3.13)
 python := "python3.13"
 
 # Default recipe
 default:
     @just --list
 
-# Setup everything: Hugin + all MCP server submodules
-setup-all: setup setup-submodules
+# Install system dependencies (OCR tools for Ratatoskr, glab for Yggdrasil)
+install-system-deps:
+    @echo "📦 Installing system dependencies..."
+    @if command -v dnf >/dev/null 2>&1; then \
+        sudo dnf install -y poppler-utils tesseract glab; \
+    elif command -v apt >/dev/null 2>&1; then \
+        sudo apt install -y poppler-utils tesseract-ocr glab; \
+    elif command -v pacman >/dev/null 2>&1; then \
+        sudo pacman -S --noconfirm poppler tesseract gitlab-cli; \
+    else \
+        echo "⚠️  Unknown package manager. Please install poppler-utils, tesseract, and glab manually."; \
+        exit 1; \
+    fi
+    @echo "✅ System dependencies installed!"
+
+# Setup everything: system deps + Hugin + all MCP server submodules
+setup-all: install-system-deps setup setup-submodules
     @echo "✅ Hugin and all MCP servers ready!"
 
 # Setup Hugin virtual environment and install dependencies
 setup:
     @echo "🔧 Setting up Hugin MCP Client..."
     @echo "Using Python: {{python}}"
+    rm -rf .venv
     {{python}} -m venv .venv
     .venv/bin/pip install --upgrade pip
     .venv/bin/pip install -e .
@@ -23,10 +39,6 @@ setup:
     @echo ""
     @echo "To run Hugin:"
     @echo "  just run"
-    @echo ""
-    @echo "Or:"
-    @echo "  source .venv/bin/activate"
-    @echo "  hugin"
 
 # Setup all MCP server submodules
 setup-submodules: setup-ratatoskr setup-muninn setup-yggdrasil
@@ -35,17 +47,23 @@ setup-submodules: setup-ratatoskr setup-muninn setup-yggdrasil
 # Setup Ratatoskr (GNOME integration)
 setup-ratatoskr:
     @echo "🔧 Setting up Ratatoskr MCP Server (GNOME integration)..."
-    cd servers/ratatoskr && just setup
+    cd servers/ratatoskr && rm -rf .venv
+    cd servers/ratatoskr && {{python}} -m venv .venv --system-site-packages
+    cd servers/ratatoskr && .venv/bin/pip install -e . pdf2image pytesseract -q
 
 # Setup Muninn (Memory/Vector DB)
 setup-muninn:
     @echo "🔧 Setting up Muninn MCP Server (Memory)..."
-    cd servers/muninn && just setup
+    cd servers/muninn && rm -rf .venv
+    cd servers/muninn && {{python}} -m venv .venv
+    cd servers/muninn && .venv/bin/pip install -e .
 
 # Setup Yggdrasil (Git hosting)
 setup-yggdrasil:
     @echo "🔧 Setting up Yggdrasil MCP Server (Git hosting)..."
-    cd servers/yggdrasil && just setup
+    cd servers/yggdrasil && rm -rf .venv
+    cd servers/yggdrasil && {{python}} -m venv .venv
+    cd servers/yggdrasil && .venv/bin/pip install -e .
 
 # Clean everything
 clean-all: clean clean-submodules
@@ -71,6 +89,11 @@ clean-submodules:
 run:
     @echo "🦅 Starting Hugin MCP Client..."
     ./run-local.sh
+
+# Run Hugin with a single prompt (non-interactive, for Unix pipelines)
+# Example: just prompt "extract timeline from PDFs" > output.md
+prompt PROMPT:
+    @.venv/bin/hugin --prompt "{{PROMPT}}" --output-only 2>/dev/null
 
 # Run tests
 test:

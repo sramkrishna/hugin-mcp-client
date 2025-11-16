@@ -251,7 +251,7 @@ class Orchestrator:
 
         return head + compression_note + tail
 
-    async def process_message(self, user_message: str, max_iterations: int = 10) -> str:
+    async def process_message(self, user_message: str, max_iterations: int = 50) -> str:
         """
         Process a user message with LLM and MCP tools.
 

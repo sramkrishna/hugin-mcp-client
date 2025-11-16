@@ -36,7 +36,7 @@ class AnthropicProvider(LLMProvider):
         self,
         user_message: str,
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> Message:
         """
         Send a message to the LLM with retry logic and prompt caching.

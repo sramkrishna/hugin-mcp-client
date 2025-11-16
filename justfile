@@ -90,6 +90,11 @@ run:
     @echo "🦅 Starting Hugin MCP Client..."
     ./run-local.sh
 
+# Run Hugin without frame around responses (for easier copy-paste)
+run-plain:
+    @echo "🦅 Starting Hugin MCP Client (plain output)..."
+    ./run-local.sh --no-frame
+
 # Run Hugin with a single prompt (non-interactive, for Unix pipelines)
 # Example: just prompt "extract timeline from PDFs" > output.md
 prompt PROMPT:

@@ -46,4 +46,5 @@ echo ""
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export LOG_FILE="${LOG_FILE:-logs/hugin.log}"
 
-.venv/bin/hugin
+# Pass all command-line arguments to hugin
+.venv/bin/hugin "$@"

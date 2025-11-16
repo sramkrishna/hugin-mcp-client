@@ -56,6 +56,11 @@ def parse_args():
         default=50,
         help="Maximum iterations for tool use (default: 50)",
     )
+    parser.add_argument(
+        "--no-frame",
+        action="store_true",
+        help="Disable frame around responses for easier copy-paste",
+    )
     return parser.parse_args()
 
 
@@ -164,8 +169,12 @@ def create_llm_provider(llm_config: dict, quiet: bool = False):
     return llm_client
 
 
-async def main_async() -> None:
-    """Async main function (interactive mode)."""
+async def main_async(no_frame: bool = False) -> None:
+    """Async main function (interactive mode).
+
+    Args:
+        no_frame: If True, disable frame around responses for easier copy-paste
+    """
     # Setup logging
     log_level = os.getenv("LOG_LEVEL", "INFO")
     log_file = os.getenv("LOG_FILE")
@@ -261,13 +270,18 @@ async def main_async() -> None:
                 response = await orchestrator.process_message(user_input)
 
                 # Display response
-                console.print(
-                    Panel(
-                        Markdown(response),
-                        title="🤖 Assistant",
-                        border_style="blue",
+                if no_frame:
+                    # Plain output without frame for easier copy-paste
+                    console.print(Markdown(response))
+                else:
+                    # Fancy output with frame
+                    console.print(
+                        Panel(
+                            Markdown(response),
+                            title="🤖 Assistant",
+                            border_style="blue",
+                        )
                     )
-                )
 
                 # Display token usage if available (Anthropic provider)
                 if hasattr(llm_client, 'format_token_usage'):
@@ -419,7 +433,7 @@ def main() -> None:
 
     # Interactive mode (existing behavior)
     try:
-        asyncio.run(main_async())
+        asyncio.run(main_async(no_frame=args.no_frame))
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted[/yellow]")
         sys.exit(0)

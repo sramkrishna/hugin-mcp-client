@@ -1,10 +1,12 @@
 # NPU Status on Fedora 43 (Lunar Lake)
 
-**Last Updated:** 2025-11-23
-**System:** Fedora 43, Kernel 6.17.6-300.fc43.x86_64
+**Last Updated:** 2025-11-23 (Post-System Update)
+**System:** Fedora 43, Kernel 6.17.8-300.fc43.x86_64 (updated from 6.17.6)
 **Hardware:** Intel Lunar Lake NPU (rev 04)
 
 ## Current Status: ⚠️ Detected but Not Functional
+
+**Update 2025-11-23 17:06:** System update including Level Zero 1.25.2, kernel 6.17.8, and Mesa 25.2.6 **did NOT fix** the NPU crash. Issue persists.
 
 The NPU hardware is **detected** and has drivers installed, but **crashes during model compilation** due to Intel compute runtime compatibility issues.
 
@@ -70,9 +72,13 @@ These warnings suggest a **version mismatch** between OpenVINO and the NPU compi
 | OpenVINO | 2025.1.0-000-- | ✓ Installed |
 | Intel NPU Driver | 1.16.0-1.fc44 | ✓ Installed |
 | Intel Level Zero | 25.31.34666.3-1.fc43 | ✓ Installed |
-| OneAPI Level Zero | 1.24.3-1.fc43 | ✓ Installed |
-| Linux Kernel | 6.17.6-300.fc43.x86_64 | ✓ Running |
+| OneAPI Level Zero | **1.25.2-1.fc43** ⬆️ | ✓ Installed (updated from 1.24.3) |
+| Linux Kernel | **6.17.8-300.fc43.x86_64** ⬆️ | ✓ Running (updated from 6.17.6) |
+| Mesa | **25.2.6** ⬆️ | ✓ Installed (updated from 25.2.5) |
+| Intel GPU Firmware | **20251111** ⬆️ | ✓ Installed (updated from 20251021) |
 | Fedora Version | 43 | ✓ Running |
+
+**Note:** Updates applied 2025-11-23 did not resolve the compilation crash.
 
 ## Root Cause Analysis
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hugin-mcp-client"
-version = "0.1.0"
+version = "1.0.0"
 description = "MCP Client for interacting with LLMs and MCP servers - Hugin, Odin's raven of thought"
 readme = "README.md"
 requires-python = ">=3.9"

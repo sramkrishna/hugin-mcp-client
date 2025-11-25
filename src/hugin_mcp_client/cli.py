@@ -303,7 +303,27 @@ async def main_async(no_frame: bool = False) -> None:
                 console.print(f"[dim]DEBUG - Error type: {error_type}[/dim]")
                 console.print(f"[dim]DEBUG - Error message: {error_msg[:200]}[/dim]")
 
-                if "credit balance is too low" in error_msg or "billing" in error_msg.lower():
+                if "prompt is too long" in error_msg or "tokens > " in error_msg:
+                    console.print(
+                        "\n[red]💬 Context Window Exceeded[/red]\n\n"
+                        "Your conversation history has grown too large and exceeded the token limit.\n\n"
+                        "[cyan]What this means:[/cyan]\n"
+                        "  • Too many messages and tool results have accumulated\n"
+                        "  • The AI can't process any more in this conversation\n\n"
+                        "[cyan]Solution:[/cyan]\n"
+                        "  • Type [bold]'clear'[/bold] to reset the conversation\n"
+                        "  • This will erase conversation history but keep MCP connections\n\n"
+                        "[cyan]What you'll lose:[/cyan]\n"
+                        "  • Previous messages and context from this session\n"
+                        "  • The AI won't remember earlier parts of the conversation\n\n"
+                        "[cyan]What you'll keep:[/cyan]\n"
+                        "  • All MCP server connections (calendar, email, etc.)\n"
+                        "  • Tool availability and functionality\n"
+                        "  • Your data (nothing is deleted from your system)\n\n"
+                        "[yellow]Tip:[/yellow] For long research sessions, consider using the\n"
+                        "'just prompt' command for one-off queries to avoid history buildup.\n"
+                    )
+                elif "credit balance is too low" in error_msg or "billing" in error_msg.lower():
                     console.print(
                         "\n[red]💳 Insufficient API Credits[/red]\n\n"
                         "Your Anthropic API account has run out of credits.\n\n"

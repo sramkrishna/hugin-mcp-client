@@ -1,4 +1,4 @@
-# Odinson Release Process
+# Hugin Release Process
 
 ## Pre-Release Checklist
 
@@ -32,7 +32,7 @@
 
 4. **Create Git Tag**
    ```bash
-   git tag -a v1.0.0 -m "Release v1.0.0 - Odinson Personal AI System"
+   git tag -a v1.0.0 -m "Release v1.0.0 - Hugin MCP Client"
    git push origin v1.0.0
    ```
 
@@ -108,7 +108,7 @@ git branch -d feature/my-feature
 ## Release Notes Template
 
 ```markdown
-# Odinson v1.0.0 - "The First Flight"
+# Hugin v1.0.0 - "The First Flight"
 
 Release Date: YYYY-MM-DD
 

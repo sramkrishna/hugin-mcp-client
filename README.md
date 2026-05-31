@@ -4,6 +4,21 @@ A Python client for connecting LLMs (Large Language Models) with MCP (Model Cont
 
 Named after Hugin, one of Odin's ravens in Norse mythology who flies around the world gathering information and bringing it back. Just as Hugin gathers knowledge, this client gathers information through MCP servers and AI.
 
+## Install
+
+```bash
+# Clone with submodules
+git clone --recursive https://github.com/sramkrishna/hugin-mcp-client.git
+cd hugin-mcp-client
+
+# Setup
+just setup-all
+cp config.example.toml config.toml
+
+# Or install from local checkout
+pip install -e .
+```
+
 ## Complete Suite
 
 This repository includes everything you need via git submodules:
@@ -291,6 +306,45 @@ src/hugin_mcp_client/
 ├── llm_client.py       # LLM client (Anthropic)
 ├── mcp_client.py       # MCP protocol client
 └── orchestrator.py     # Coordinates LLM + MCP
+```
+
+## Agents
+
+Hugin includes a growing collection of autonomous agents that handle multi-step
+program management workflows — designed for the agentic OS vision described in
+the NVIDIA FOSS Fund Program Manager role.
+
+### Project Discovery Agent
+
+Identifies open-source projects that align with a fund's investment profile.
+Learns from past recipients, searches GitHub + web in parallel, ranks by
+relevance, and produces a structured funding brief with human review checklist.
+
+```bash
+# Run with heuristic ranking (no API key needed)
+hugin-discover
+
+# Or with a specific domain query
+hugin-discover CUDA ML tooling
+
+# With a GitHub token for better results
+GITHUB_TOKEN="***" hugin-discover
+
+# With LLM-based ranking (config.toml must have API key)
+# The agent:
+#   1. Loads known FOSS Fund recipients from its training set
+#   2. Learns a profile of what the fund supports
+#   3. Searches multiple sources in parallel
+#   4. Ranks candidates against the fund profile
+#   5. Generates a markdown report with human review checklist
+```
+
+**Architecture:**
+```
+Phase 0: LEARN from known recipients → FundProfile
+Phase 1: SEARCH in parallel (GitHub API + Web)
+Phase 2: RANK candidates against profile (LLM or heuristic)
+Phase 3: REPORT → markdown with human review checklist
 ```
 
 ## How It Works

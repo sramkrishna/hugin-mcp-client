@@ -687,7 +687,7 @@ async def send_telegram(
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-STATE_DIR = Path(os.environ.get("HUGIN_STATE_DIR", os.path.expanduser("~/.local/hugin/state")))
+STATE_DIR = Path(os.environ.get("HUGIN_STATE_DIR", os.path.expanduser("~/.local/share/hugin/state")))
 
 async def run_dashboard(run_type: str = "morning", cfg: DashboardConfig | None = None) -> tuple[DashboardReport, DashboardConfig]:
     """
@@ -790,7 +790,7 @@ async def main():
     # Write briefing to user-facing location
     briefing_path = Path(os.environ.get(
         "HUGIN_BRIEFING_PATH",
-        os.path.expanduser("~/.local/hugin/briefing.md"),
+        os.path.expanduser("~/.local/share/hugin/briefing.md"),
     ))
     briefing_path.parent.mkdir(parents=True, exist_ok=True)
     with open(briefing_path, "w") as f:

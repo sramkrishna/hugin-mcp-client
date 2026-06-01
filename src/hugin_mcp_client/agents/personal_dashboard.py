@@ -401,7 +401,7 @@ async def _summarize_thread_async(msgs: list[dict]) -> str:
     )
 
     try:
-        from hugin_mcp_client.llm_client import LLMClient
+        from hugin_mcp_client.agents.provider import create_provider
         from hugin_mcp_client.llm_provider import LLMProvider
         import tomllib
 
@@ -414,7 +414,7 @@ async def _summarize_thread_async(msgs: list[dict]) -> str:
             llm_config = cfg.get("llm", {})
             provider_name = llm_config.get("provider", "openai")
 
-            provider: LLMProvider = LLMClient.create_provider(provider_name, llm_config)
+            provider: LLMProvider = create_provider(provider_name, llm_config)
             response = provider.create_message(user_message=prompt, tools=[])
             summary = provider.extract_text_response(response).strip()
             if summary:

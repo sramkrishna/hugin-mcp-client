@@ -291,7 +291,7 @@ async def rank_candidates(
 
     # Try loading Hugin's LLM provider
     try:
-        from hugin_mcp_client.llm_client import LLMClient
+        from hugin_mcp_client.agents.provider import create_provider
         from hugin_mcp_client.llm_provider import LLMProvider
         import tomllib
     except ImportError:
@@ -341,7 +341,7 @@ async def rank_candidates(
 
     try:
         # Use Hugin's LLM provider directly
-        provider: LLMProvider = LLMClient.create_provider(provider_name, llm_config)
+        provider: LLMProvider = create_provider(provider_name, llm_config)
 
         # Add a system-style instruction via user message
         response = provider.create_message(
@@ -413,7 +413,7 @@ async def learn_profile() -> FundProfile:
 
     # Try LLM-based analysis
     try:
-        from hugin_mcp_client.llm_client import LLMClient
+        from hugin_mcp_client.agents.provider import create_provider
         from hugin_mcp_client.llm_provider import LLMProvider
         import tomllib
 
@@ -443,7 +443,7 @@ async def learn_profile() -> FundProfile:
             - search_queries (list[str]): 5 search queries for finding similar projects
             """)
 
-            provider: LLMProvider = LLMClient.create_provider(provider_name, llm_config)
+            provider: LLMProvider = create_provider(provider_name, llm_config)
             response = provider.create_message(user_message=prompt, tools=[])
             raw = provider.extract_text_response(response)
             data = json.loads(raw)

@@ -3,7 +3,7 @@ Description=Hugin — watch for state changes and trigger notification
 Documentation=https://github.com/sramkrishna/hugin-mcp-client
 
 [Path]
-PathModified=%h/.hugin/state/dashboard_state.json
+PathModified=%h/.local/hugin/state/dashboard_state.json
 
 [Install]
 WantedBy=default.target

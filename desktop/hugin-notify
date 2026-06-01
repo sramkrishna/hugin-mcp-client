@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-STATE_DIR="${HOME}/.hugin/state"
-BRIEFING_FILE="${HOME}/.hugin/briefing.md"
+STATE_DIR="${HOME}/.local/hugin/state"
+BRIEFING_FILE="${HOME}/.local/hugin/briefing.md"
 STATE_FILE="${STATE_DIR}/dashboard_state.json"
 
 # If there's a briefing file, extract the highlights

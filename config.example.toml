@@ -114,6 +114,13 @@ backend = "ratatoskr"
 # user = "sri@ramkrishna.me"
 # app_password = "yyyy yyyy yyyy yyyy"
 
+# Senders to ignore entirely (partial match, case-insensitive)
+# Mailing list bots, notification services you don't want in briefings.
+# ignore_senders = [
+#     "server@matrix.pdxhpc.etke.host",
+#     "mailing-list@example.org",
+# ]
+
 # Telegram notification settings (optional)
 # If set, the briefing is pushed to your phone + desktop Telegram.
 # Steps:

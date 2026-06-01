@@ -8,13 +8,29 @@ Purpose:
 
 Design:
     - Scheduled via cron/systemd timer (not a daemon)
+    - Configurable backend: ratatoskr (Evolution) or gmail (MCP servers)
     - Stateless by default; state lives in Muninn (semantic memory)
     - Falls back to flat JSON files if Muninn is unavailable
     - Output is a markdown briefing and a todo list
 
+Configuration (config.toml):
+    [dashboard]
+    backend = "gmail"           # "ratatoskr" or "gmail"
+
+    # Gmail backend requires MCP servers configured :
+    [servers.gmail]
+    command = "npx"
+    args = ["-y", "@modelcontextprotocol/server-gmail"]
+
+    [servers.gcal]
+    command = "npx"
+    args = ["-y", "@googleapis/calendar-mcp-server"]
+
 Dependencies:
-    ratatoskr MCP server (for email + calendar + Planify tasks)
-    muninn MCP server (for persistent memory across runs)
+    ratatoskr MCP server (for Evolution email + calendar + Planify tasks)
+    gmail MCP server      (for Gmail API — community or official)
+    gcal MCP server       (for Google Calendar — official or community)
+    muninn MCP server     (for persistent memory across runs)
 """
 
 from __future__ import annotations
@@ -76,25 +92,158 @@ class DashboardReport:
     errors: list[str] = field(default_factory=list)
 
 # ---------------------------------------------------------------------------
+# Backend configuration
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DashboardConfig:
+    """Dashboard backend configuration, read from config.toml."""
+    backend: str = "ratatoskr"  # "ratatoskr" or "gmail"
+    telegram_token: str = ""     # bot token from @BotFather
+    telegram_chat_id: str = ""   # your chat ID (message the bot once to get it)
+    gmail_user: str = ""         # Gmail address (used when backend="gmail")
+    gmail_app_password: str = "" # Gmail App Password (no Cloud Console needed)
+
+
+def load_dashboard_config() -> DashboardConfig:
+    """Read dashboard configuration from Hugin's config.toml."""
+    config = DashboardConfig()
+
+    try:
+        import tomllib
+        config_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "config.toml"
+        )
+        if not os.path.exists(config_path):
+            return config
+
+        with open(config_path, "rb") as f:
+            raw = tomllib.load(f)
+
+        dashboard_cfg = raw.get("dashboard", {})
+        backend = dashboard_cfg.get("backend", "ratatoskr")
+        if backend in ("ratatoskr", "gmail"):
+            config.backend = backend
+
+        config.telegram_token = dashboard_cfg.get("telegram_token", "")
+        config.telegram_chat_id = dashboard_cfg.get("telegram_chat_id", "")
+        config.gmail_user = dashboard_cfg.get("gmail_user", "")
+        config.gmail_app_password = dashboard_cfg.get("gmail_app_password", "")
+
+        if config.telegram_token:
+            logger.info("Telegram notifications configured")
+        logger.info(f"Dashboard config: backend={config.backend}")
+    except Exception as e:
+        logger.warning(f"Could not load dashboard config: {e}")
+
+    return config
+
+
+# ---------------------------------------------------------------------------
 # Phase 1: Gather data from MCP servers
 # ---------------------------------------------------------------------------
 
 async def fetch_recent_email(
     hours: int = 24,
+    backend: str = "ratatoskr",
+    cfg: DashboardConfig | None = None,
 ) -> list[EmailThread]:
     """
-    Search Ratatoskr for email from the last N hours.
-    Returns simplified thread summaries.
+    Fetch recent email from the configured backend.
+
+    Supports:
+      ratatoskr — Evolution Data Server via Ratatoskr MCP
+      gmail     — Gmail IMAP (App Password, no Cloud Console needed)
     """
-    # This phase requires the Ratatoskr MCP server running.
-    # For now, return a placeholder — real integration needs the MCP client.
-    logger.info(f"Would fetch email from last {hours}h via Ratatoskr")
+    if backend == "gmail" and cfg and cfg.gmail_user and cfg.gmail_app_password:
+        return await _fetch_gmail_imap(cfg.gmail_user, cfg.gmail_app_password, hours)
+    elif backend == "ratatoskr":
+        logger.info(f"Would fetch email from last {hours}h via Ratatoskr")
+    else:
+        logger.info(f"No credentials for backend={backend}")
+
     return []
 
 
-async def fetch_calendar_today() -> list[str]:
-    """Pull today's events via Ratatoskr calendar integration."""
-    logger.info("Would fetch today's calendar via Ratatoskr")
+async def _fetch_gmail_imap(
+    user: str,
+    app_password: str,
+    hours: int = 24,
+) -> list[EmailThread]:
+    """
+    Fetch recent email via Gmail IMAP, no Cloud Console needed.
+    Requires Gmail App Password (Settings → Security → App Passwords).
+    """
+    import imaplib
+    import email as email_parser
+    from email.utils import parsedate_to_datetime
+
+    threads: list[EmailThread] = []
+
+    try:
+        logger.info(f"Connecting to Gmail IMAP as {user}")
+
+        # Run IMAP in a thread to avoid blocking
+        def _fetch():
+            conn = imaplib.IMAP4_SSL("imap.gmail.com")
+            conn.login(user, app_password)
+            conn.select("INBOX")
+
+            # Search for mail from the last N hours
+            import time
+            since = int(time.time()) - hours * 3600
+            _, message_ids = conn.search(
+                None, f"(SINCE {time.strftime('%d-%b-%Y', time.gmtime(since))})"
+            )
+
+            results: list[EmailThread] = []
+            for mid in message_ids[0].split()[-20:]:  # last 20
+                _, msg_data = conn.fetch(mid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
+                if not msg_data or not msg_data[0]:
+                    continue
+                raw_header = msg_data[0][1]
+                msg = email_parser.message_from_bytes(raw_header)
+
+                subject = msg.get("Subject", "(no subject)")
+                from_addr = msg.get("From", "unknown")
+                date_str = msg.get("Date", "")
+
+                results.append(EmailThread(
+                    subject=subject,
+                    participants=[from_addr],
+                    latest_from=from_addr,
+                    snippet=subject,
+                    date=date_str,
+                ))
+
+            conn.logout()
+            return results
+
+        threads = await asyncio.to_thread(_fetch)
+        logger.info(f"Fetched {len(threads)} threads from Gmail")
+
+    except Exception as e:
+        logger.error(f"Gmail IMAP fetch failed: {e}")
+
+    return threads
+
+
+async def fetch_calendar_today(backend: str = "ratatoskr", cfg: DashboardConfig | None = None) -> list[str]:
+    """
+    Pull today's events from the configured backend.
+
+    Supports:
+      ratatoskr — Evolution calendar via Ratatoskr MCP
+      gmail     — Google Calendar requires either:
+                  - Google Calendar MCP server (needs Cloud Console OAuth)
+                  - Or use Ratatoskr with Evolution connected to the same account
+                  Calendar is skipped for now if only Gmail IMAP is configured.
+    """
+    if backend == "gmail":
+        logger.info("Calendar: Gmail IMAP backend doesn't support calendar. Set up Evolution + Ratatoskr for calendar.")
+    else:
+        logger.info("Would fetch today's calendar via Ratatoskr")
+
     return []
 
 
@@ -265,16 +414,88 @@ def generate_briefing(
     return "\n".join(lines)
 
 # ---------------------------------------------------------------------------
+# Telegram notification
+# ---------------------------------------------------------------------------
+
+async def send_telegram(
+    token: str,
+    chat_id: str,
+    briefing: str,
+    report: DashboardReport,
+) -> None:
+    """
+    Send a condensed briefing as a Telegram message.
+    Falls back to sending just a summary if the full briefing is too long.
+    Telegram has a 4096-char limit per message.
+    """
+    if not token or not chat_id:
+        return
+
+    # Build a condensed version for Telegram
+    lines = [f"📋 **{report.run_type.title()} Briefing**"]
+
+    if report.calendar_today:
+        lines.append(f"\n📅 **Today**")
+        for ev in report.calendar_today[:5]:
+            lines.append(f"  • {ev}")
+
+    open_items = [a for a in report.action_items if a.status == "open"]
+    if open_items:
+        lines.append(f"\n✅ **Action Items ({len(open_items)})**")
+        for item in open_items[:8]:
+            mark = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(item.priority, "🟡")
+            lines.append(f"  {mark} {item.description[:120]}")
+
+    if report.threads:
+        lines.append(f"\n📧 **Recent**")
+        for t in report.threads[:5]:
+            lines.append(f"  • {t.subject} — {t.latest_from}")
+
+    if report.new_contacts:
+        lines.append(f"\n👤 **New contacts**")
+        for c in report.new_contacts:
+            lines.append(f"  • {c.name}")
+
+    if report.errors:
+        lines.append(f"\n⚠️ {len(report.errors)} error(s)")
+
+    body = "\n".join(lines)
+    body = body[:4000]  # stay under Telegram's limit
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": body,
+        "parse_mode": "Markdown",
+        "disable_notification": False,
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as resp:
+                if resp.status != 200:
+                    logger.warning(f"Telegram send failed: {resp.status} — {(await resp.text())[:200]}")
+                else:
+                    logger.info("Briefing sent via Telegram")
+    except Exception as e:
+        logger.warning(f"Telegram send error: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
 STATE_DIR = Path(os.environ.get("HUGIN_STATE_DIR", os.path.expanduser("~/.hugin/state")))
 
-async def run_dashboard(run_type: str = "morning") -> DashboardReport:
+async def run_dashboard(run_type: str = "morning", cfg: DashboardConfig | None = None) -> tuple[DashboardReport, DashboardConfig]:
     """
     Full pipeline: gather → summarize → brief → save state.
+    Returns (report, config) so the caller can send notifications.
     """
     logger.info(f"Starting {run_type} dashboard run")
+
+    if cfg is None:
+        cfg = load_dashboard_config()
 
     report = DashboardReport(
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
@@ -282,8 +503,8 @@ async def run_dashboard(run_type: str = "morning") -> DashboardReport:
     )
 
     # Phase 1: Gather in parallel
-    threads_task = fetch_recent_email()
-    calendar_task = fetch_calendar_today()
+    threads_task = fetch_recent_email(backend=cfg.backend, cfg=cfg)
+    calendar_task = fetch_calendar_today(backend=cfg.backend, cfg=cfg)
     tasks_task = fetch_tasks()
     memory_task = fetch_memory_context()
 
@@ -311,7 +532,7 @@ async def run_dashboard(run_type: str = "morning") -> DashboardReport:
     report.action_items = extract_action_items(report.threads, prior_items)
     report.new_contacts = extract_contacts(report.threads, known_contacts)
 
-    return report
+    return report, cfg
 
 
 def save_state(report: DashboardReport) -> str:
@@ -360,7 +581,7 @@ async def main():
 
     print(f"\n📋 Personal Dashboard — {run_type.title()} Briefing\n")
 
-    report = await run_dashboard(run_type)
+    report, cfg = await run_dashboard(run_type)
     state_path = save_state(report)
     briefing = generate_briefing(report, state_path)
 
@@ -372,6 +593,10 @@ async def main():
     briefing_path.parent.mkdir(parents=True, exist_ok=True)
     with open(briefing_path, "w") as f:
         f.write(briefing)
+
+    # Send via Telegram if configured
+    if cfg.telegram_token and cfg.telegram_chat_id:
+        await send_telegram(cfg.telegram_token, cfg.telegram_chat_id, briefing, report)
 
     print(briefing)
     print(f"📄 Briefing saved to {briefing_path}")

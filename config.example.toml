@@ -61,3 +61,60 @@ provider = "anthropic"
 # [servers.my_server]
 # command = "my-mcp-server"  # Must be in PATH
 # args = ["--workspace", "/path/to/workspace"]
+
+# Gmail IMAP — email access for the dashboard agent
+# Uses App Passwords — no Google Cloud Console needed.
+#
+# Steps to set up:
+#   1. Enable 2FA on your Google account (required for app passwords)
+#   2. Visit https://myaccount.google.com/apppasswords
+#   3. Generate a 16-character app password for "Mail"
+#   4. Put your email + that password in [dashboard] below
+#
+# For calendar events with Gmail, you'll need either:
+#   - Evolution + Ratatoskr connected to the same account, or
+#   - Google Calendar MCP server (requires Cloud Console OAuth)
+#
+# [servers.gmail]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-gmail"]
+
+# Google Calendar MCP server (optional, Cloud Console OAuth)
+# [servers.gcal]
+# command = "npx"
+# args = ["-y", "@googleapis/calendar-mcp-server"]
+
+# ---------------------------------------------------------------------------
+# Personal Dashboard Agent  —  hugin-dashboard
+#
+# Runs 2x/day (via systemd timer), gathers recent email and calendar events,
+# extracts action items, tracks new contacts, and pushes a condensed briefing
+# to your phone via Telegram.
+#
+# Two data backends:
+#   ratatoskr  — Evolution Data Server (email + calendar + tasks)
+#                Full featured, requires Evolution configured locally
+#   gmail      — Gmail IMAP with App Passwords (email only)
+#                Calendar needs separate setup
+# ---------------------------------------------------------------------------
+[dashboard]
+
+# Data backend: "ratatoskr" (default) or "gmail"
+backend = "ratatoskr"
+
+# Gmail IMAP settings (used when backend = "gmail")
+# Generate an App Password at https://myaccount.google.com/apppasswords
+# gmail_user = "you@stoneandkey.consulting"
+# gmail_app_password = "xxxx xxxx xxxx xxxx"
+
+# Telegram notification settings (optional)
+# If set, the briefing is pushed to your phone + desktop Telegram.
+# Steps:
+#   1. Talk to @BotFather on Telegram → create a bot → get token
+#   2. Message your bot (just say "hi")
+#   3. Visit https://api.telegram.org/bot<TOKEN>/getUpdates
+#      to find your chat_id (look for "chat":{"id": 12345})
+#   4. Uncomment the two lines below
+#
+# telegram_token = "1234567890:ABCdef..."
+# telegram_chat_id = "233634147"

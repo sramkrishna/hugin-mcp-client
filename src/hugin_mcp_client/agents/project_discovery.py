@@ -145,12 +145,19 @@ async def search_github(
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
+    # Warn if no token
+    if not token:
+        logger.warning("No GITHUB_TOKEN set — API is rate-limited and results will be poor. "
+                       "Set GITHUB_TOKEN for quality results.")
+
     # Build a targeted GitHub search query from the domain
-    # We try repo search first for structured results
     search_queries = _build_github_queries(query)
 
     seen_urls: set[str] = set()
     results: list[ProjectCandidate] = []
+
+    import datetime
+    cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)).isoformat()
 
     should_close = session is None
     if session is None:
@@ -164,7 +171,9 @@ async def search_github(
             if len(results) >= limit:
                 break
             url = "https://api.github.com/search/repositories"
-            params = {"q": sq, "sort": "stars", "per_page": min(limit - len(results), 10)}
+            # Target projects with meaningful community interest
+            qualified = f"{sq}+stars:>20+pushed:>={cutoff[:10]}"
+            params = {"q": qualified, "sort": "stars", "per_page": min(limit, 15)}
             try:
                 async with session.get(url, params=params) as resp:
                     if resp.status != 200:
@@ -181,8 +190,12 @@ async def search_github(
                     continue
                 seen_urls.add(repo_url)
                 topics = item.get("topics", []) or []
+                stars = item.get("stargazers_count", 0)
 
-                # Relative recency from pushed_at
+                # Skip low-quality results
+                if stars < 5:
+                    continue
+
                 pushed = item.get("pushed_at", "")
                 activity = f"Last push: {pushed}" if pushed else ""
 
@@ -191,11 +204,40 @@ async def search_github(
                     url=repo_url,
                     source="github_search",
                     description=item.get("description") or "",
-                    stars=item.get("stargazers_count", 0),
+                    stars=stars,
                     language=item.get("language") or "",
                     topics=topics,
                     recent_activity=activity,
                 ))
+            # Fallback: if no results with filters, try without star/pushed filter
+            if not results:
+                logger.info(f"No high-quality results for '{sq}', trying broader search")
+                params = {"q": sq, "sort": "stars", "per_page": min(limit, 10)}
+                try:
+                    async with session.get(url, params=params) as resp:
+                        if resp.status == 200:
+                            body = await resp.json()
+                            for item in body.get("items", []):
+                                repo_url = item.get("html_url", "")
+                                if repo_url in seen_urls:
+                                    continue
+                                seen_urls.add(repo_url)
+                                stars = item.get("stargazers_count", 0)
+                                if stars < 5:
+                                    continue
+                                results.append(ProjectCandidate(
+                                    name=item.get("full_name", repo_url.split("/")[-1]),
+                                    url=repo_url,
+                                    source="github_search",
+                                    description=item.get("description") or "",
+                                    stars=stars,
+                                    language=item.get("language") or "",
+                                    topics=item.get("topics", []) or [],
+                                    recent_activity=item.get("pushed_at", ""),
+                                ))
+                except Exception:
+                    pass
+
     finally:
         if should_close:
             await session.close()
@@ -256,8 +298,12 @@ async def search_web(
             url = item.get("href", "") or item.get("link", "")
             if not url or url in seen_urls:
                 continue
-            # Skip non-project URLs
-            if any(skip in url for skip in ("youtube.com", "amazon.", "reddit.com/r/")):
+            # Skip non-project URLs — listicles, news, social
+            if any(skip in url for skip in (
+                "youtube.com", "amazon.", "reddit.com/r/",
+                "listicle", "blog/", "news/", "github.com/topics",
+                "libhunt", "toolradar", "anaconda.com/guides",
+            )):
                 continue
             seen_urls.add(url)
             title = item.get("title", "") or item.get("text", "")[:80]

@@ -46,6 +46,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None  # Telegram notification won't work without it
+    import warnings
+    warnings.warn("aiohttp not installed. Install with: pip install aiohttp")
+
 logger = logging.getLogger("personal_dashboard")
 
 # ---------------------------------------------------------------------------
@@ -469,6 +476,10 @@ async def send_telegram(
         "parse_mode": "Markdown",
         "disable_notification": False,
     }
+
+    if aiohttp is None:
+        logger.warning("aiohttp not installed — skipping Telegram notification")
+        return
 
     try:
         async with aiohttp.ClientSession() as session:

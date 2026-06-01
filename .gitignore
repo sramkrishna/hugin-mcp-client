@@ -84,3 +84,6 @@ medical-reports/
 discovery_report.md
 *.briefing.md
 state/
+
+# Local hugin runtime data
+.local/share/hugin/

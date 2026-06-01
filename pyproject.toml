@@ -52,7 +52,8 @@ vllm = [
 
 [project.scripts]
 hugin = "hugin_mcp_client.cli:main"
-hugin-discover = "hugin_mcp_client.agents.project_discovery:main"
+hugin-discover = "hugin_mcp_client.agents.project_discovery:cli"
+hugin-dashboard = "hugin_mcp_client.agents.personal_dashboard:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]

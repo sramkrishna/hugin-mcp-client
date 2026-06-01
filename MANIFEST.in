@@ -1,0 +1,12 @@
+# Include config template for new installs
+include config.example.toml
+
+# Include submodule sources in sdist
+recursive-include servers/ *.py
+recursive-include servers/ *.toml
+recursive-include servers/ *.md
+recursive-include servers/ README*
+recursive-include servers/ pyproject.toml
+
+# Include docs
+recursive-include docs/ *

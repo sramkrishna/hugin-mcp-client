@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Hugin desktop notification — triggered by state sync
+# Reads the latest briefing and shows a GNOME notification.
+
+set -euo pipefail
+
+STATE_DIR="${HOME}/.hugin/state"
+BRIEFING_FILE="${HOME}/.hugin/briefing.md"
+STATE_FILE="${STATE_DIR}/dashboard_state.json"
+
+# If there's a briefing file, extract the highlights
+if [[ -f "$BRIEFING_FILE" ]]; then
+    # Count action items
+    ACTION_COUNT=$(grep -c '🟡\|🔴\|🟢' "$BRIEFING_FILE" 2>/dev/null || echo 0)
+    # Grab calendar events if any
+    CALENDAR=$(sed -n '/📅/,/✅/p' "$BRIEFING_FILE" 2>/dev/null \
+                | grep '^- ' | head -3 | tr '\n' ' ' || echo "")
+    # Grab the first few thread subjects
+    THREADS=$(sed -n '/📧/,/👤/p' "$BRIEFING_FILE" 2>/dev/null \
+              | grep '^\*\*' | head -3 | sed 's/\*\*//g' | tr '\n' ' ' || echo "")
+fi
+
+# Build notification body
+BODY=""
+
+if [[ -n "$CALENDAR" ]]; then
+    BODY+="📅 ${CALENDAR}"
+fi
+
+if [[ "$ACTION_COUNT" -gt 0 ]]; then
+    BODY+="✅ ${ACTION_COUNT} action item(s)"
+fi
+
+if [[ -n "$THREADS" ]]; then
+    [[ -n "$BODY" ]] && BODY+="\n"
+    BODY+="📧 ${THREADS}"
+fi
+
+if [[ -z "$BODY" ]]; then
+    BODY="No new items. Dashboard ran successfully."
+fi
+
+# Read the run timestamp from state if available
+TIMESTAMP=""
+if [[ -f "$STATE_FILE" ]]; then
+    TIMESTAMP=$(python3 -c "import json; d=json.load(open('$STATE_FILE')); print(d.get('last_run',''))" 2>/dev/null || echo "")
+fi
+
+TITLE="Hugin Dashboard"
+[[ -n "$TIMESTAMP" ]] && TITLE+=" — ${TIMESTAMP}"
+
+# Fire notification
+notify-send \
+    --app-name="Hugin" \
+    --urgency=normal \
+    --expire-time=10000 \
+    "$TITLE" \
+    "$BODY"
+
+# Also write a last-notified marker so we don't double-fire
+echo "$(date -Is)" > "${STATE_DIR}/last_notified"

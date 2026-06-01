@@ -80,3 +80,7 @@ POTS*
 aarti*
 pots*
 medical-reports/
+# Agent output
+discovery_report.md
+*.briefing.md
+state/

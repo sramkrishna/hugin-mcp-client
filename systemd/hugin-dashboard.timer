@@ -1,0 +1,18 @@
+[Unit]
+Description=Hugin Dashboard — 2x daily briefing (weekdays)
+Documentation=https://github.com/sramkrishna/hugin-mcp-client
+
+[Timer]
+# Morning briefing: 8:00 AM
+OnCalendar=Mon..Fri 08:00:00
+# Evening briefing: 6:00 PM
+OnCalendar=Mon..Fri 18:00:00
+
+# Catch up after reboot or sleep
+Persistent=true
+
+# Small random delay to avoid load spikes
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

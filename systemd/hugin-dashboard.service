@@ -1,0 +1,20 @@
+[Unit]
+Description=Hugin Personal Dashboard — email summary, contact tracking, action items
+Documentation=https://github.com/sramkrishna/hugin-mcp-client
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
+ExecStart=%h/hugin-mcp-client/.venv/bin/hugin-dashboard
+StandardOutput=journal
+StandardError=journal
+
+# Security
+ProtectHome=read-only
+ProtectSystem=strict
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

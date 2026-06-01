@@ -1,0 +1,7 @@
+[Unit]
+Description=Hugin — show desktop briefing notification
+Documentation=https://github.com/sramkrishna/hugin-mcp-client
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/hugin-notify

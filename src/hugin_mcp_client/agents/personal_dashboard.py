@@ -103,13 +103,27 @@ class DashboardReport:
 # ---------------------------------------------------------------------------
 
 @dataclass
+class GmailAccount:
+    """A single Gmail account to monitor."""
+    user: str = ""
+    app_password: str = ""
+
+
+@dataclass
 class DashboardConfig:
     """Dashboard backend configuration, read from config.toml."""
     backend: str = "ratatoskr"  # "ratatoskr" or "gmail"
     telegram_token: str = ""     # bot token from @BotFather
     telegram_chat_id: str = ""   # your chat ID (message the bot once to get it)
-    gmail_user: str = ""         # Gmail address (used when backend="gmail")
-    gmail_app_password: str = "" # Gmail App Password (no Cloud Console needed)
+    gmail_accounts: list[GmailAccount] = field(default_factory=list)
+
+    @property
+    def gmail_user(self) -> str:
+        return self.gmail_accounts[0].user if self.gmail_accounts else ""
+
+    @property
+    def gmail_app_password(self) -> str:
+        return self.gmail_accounts[0].app_password if self.gmail_accounts else ""
 
 
 def load_dashboard_config() -> DashboardConfig:
@@ -134,11 +148,33 @@ def load_dashboard_config() -> DashboardConfig:
 
         config.telegram_token = dashboard_cfg.get("telegram_token", "")
         config.telegram_chat_id = dashboard_cfg.get("telegram_chat_id", "")
-        config.gmail_user = dashboard_cfg.get("gmail_user", "")
-        config.gmail_app_password = dashboard_cfg.get("gmail_app_password", "")
+        # Gmail accounts — support multiple inboxes
+        raw_accounts = dashboard_cfg.get("gmail_accounts", [])
+        if isinstance(raw_accounts, list):
+            for acct in raw_accounts:
+                if isinstance(acct, dict):
+                    config.gmail_accounts.append(GmailAccount(
+                        user=acct.get("user", "") or acct.get("gmail_user", ""),
+                        app_password=acct.get("app_password", "") or acct.get("gmail_app_password", ""),
+                    ))
+        # Also support legacy single-account config
+        elif isinstance(raw_accounts, dict):
+            config.gmail_accounts.append(GmailAccount(
+                user=raw_accounts.get("user", "") or raw_accounts.get("gmail_user", ""),
+                app_password=raw_accounts.get("app_password", "") or raw_accounts.get("gmail_app_password", ""),
+            ))
+
+        # Fallback: backward-compat with flat gmail_user / gmail_app_password fields
+        if not config.gmail_accounts:
+            user = dashboard_cfg.get("gmail_user", "")
+            pw = dashboard_cfg.get("gmail_app_password", "")
+            if user and pw:
+                config.gmail_accounts.append(GmailAccount(user=user, app_password=pw))
 
         if config.telegram_token:
-            logger.info("Telegram notifications configured")
+            logger.info(f"Telegram notifications configured")
+        if config.gmail_accounts:
+            logger.info(f"Gmail accounts: {len(config.gmail_accounts)}")
         logger.info(f"Dashboard config: backend={config.backend}")
     except Exception as e:
         logger.warning(f"Could not load dashboard config: {e}")
@@ -162,8 +198,13 @@ async def fetch_recent_email(
       ratatoskr — Evolution Data Server via Ratatoskr MCP
       gmail     — Gmail IMAP (App Password, no Cloud Console needed)
     """
-    if backend == "gmail" and cfg and cfg.gmail_user and cfg.gmail_app_password:
-        return await _fetch_gmail_imap(cfg.gmail_user, cfg.gmail_app_password, hours)
+    if backend == "gmail" and cfg and cfg.gmail_accounts:
+        all_threads: list[EmailThread] = []
+        for acct in cfg.gmail_accounts:
+            if acct.user and acct.app_password:
+                threads = await _fetch_gmail_imap(acct.user, acct.app_password, hours)
+                all_threads.extend(threads)
+        return all_threads
     elif backend == "ratatoskr":
         logger.info(f"Would fetch email from last {hours}h via Ratatoskr")
     else:

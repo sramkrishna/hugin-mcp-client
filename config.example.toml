@@ -103,9 +103,16 @@ provider = "anthropic"
 backend = "ratatoskr"
 
 # Gmail IMAP settings (used when backend = "gmail")
-# Generate an App Password at https://myaccount.google.com/apppasswords
-# gmail_user = "you@stoneandkey.consulting"
-# gmail_app_password = "xxxx xxxx xxxx xxxx"
+# Generate App Passwords at https://myaccount.google.com/apppasswords
+# Supports multiple accounts — all inboxes are merged into one briefing.
+#
+# [[dashboard.gmail_accounts]]
+# user = "sri@stoneandkey.consulting"
+# app_password = "xxxx xxxx xxxx xxxx"
+#
+# [[dashboard.gmail_accounts]]
+# user = "sri@ramkrishna.me"
+# app_password = "yyyy yyyy yyyy yyyy"
 
 # Telegram notification settings (optional)
 # If set, the briefing is pushed to your phone + desktop Telegram.
